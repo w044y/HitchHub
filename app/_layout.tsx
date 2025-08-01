@@ -1,83 +1,59 @@
-import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Tabs } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { useEffect } from 'react';
+import 'react-native-reanimated';
 
-import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
+export {
+  // Catch any errors thrown by the Layout component.
+  ErrorBoundary,
+} from 'expo-router';
+
+export const unstable_settings = {
+  // Ensure that reloading on `/modal` keeps a back button present.
+  initialRouteName: '(tabs)',
+};
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const [loaded, error] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    ...FontAwesome.font,
+  });
+
+  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  useEffect(() => {
+    if (error) throw error;
+  }, [error]);
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  if (!loaded) {
+    return null;
+  }
+
+  return <RootLayoutNav />;
 }
 
-export default function TabLayout() {
+function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-      <Tabs
-          screenOptions={{
-            tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-            tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
-            tabBarStyle: {
-              backgroundColor: Colors[colorScheme ?? 'light'].background,
-              borderTopColor: Colors[colorScheme ?? 'light'].border,
-            },
-            headerShown: useClientOnlyValue(false, true),
-            headerStyle: {
-              backgroundColor: Colors[colorScheme ?? 'light'].background,
-            },
-            headerTintColor: Colors[colorScheme ?? 'light'].text,
-          }}>
-
-        <Tabs.Screen
-            name="map"
-            options={{
-              title: 'Map',
-              tabBarIcon: ({ color }) => <TabBarIcon name="map" color={color} />,
-              headerTitle: 'HitchSpot Map',
-            }}
-        />
-
-        <Tabs.Screen
-            name="spots"
-            options={{
-              title: 'Spots',
-              tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
-              headerTitle: 'Nearby Spots',
-            }}
-        />
-
-        <Tabs.Screen
-            name="add"
-            options={{
-              title: 'Add Spot',
-              tabBarIcon: ({ color }) => <TabBarIcon name="plus-circle" color={color} />,
-              headerTitle: 'Add New Spot',
-            }}
-        />
-
-        <Tabs.Screen
-            name="community"
-            options={{
-              title: 'Community',
-              tabBarIcon: ({ color }) => <TabBarIcon name="users" color={color} />,
-              headerTitle: 'Community',
-            }}
-        />
-
-        <Tabs.Screen
-            name="profile"
-            options={{
-              title: 'Profile',
-              tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
-              headerTitle: 'My Profile',
-            }}
-        />
-
-      </Tabs>
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      </Stack>
+    </ThemeProvider>
   );
 }
