@@ -1,48 +1,97 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
+import { Platform } from 'react-native';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 import { useClientOnlyValue } from '@/components/useClientOnlyValue';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
+// Modern tab bar icon with better visual feedback
 function TabBarIcon(props: {
     name: React.ComponentProps<typeof FontAwesome>['name'];
     color: string;
+    focused: boolean;
 }) {
-    return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
+    return (
+        <FontAwesome
+            size={props.focused ? 26 : 22} // Larger when active
+            style={{
+                marginBottom: -3,
+                opacity: props.focused ? 1 : 0.7, // Subtle opacity change
+            }}
+            {...props}
+        />
+    );
 }
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
 
     return (
         <Tabs
             screenOptions={{
-                tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-                tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+                // Modern color scheme
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.textSecondary,
+
                 tabBarStyle: {
-                    backgroundColor: Colors[colorScheme ?? 'light'].background,
-                    borderTopColor: Colors[colorScheme ?? 'light'].border,
-                    height: 90, // Change tab bar height
-                    paddingBottom: 20, // Bottom padding
-                    paddingTop: 10, // Top padding
-                    // Add shadows, borders, etc.
+                    backgroundColor: '#f0f0f3',
+                    position: 'absolute',
+                    bottom: 25,
+                    left: 20,
+                    right: 20,
+                    borderRadius: 25,
+                    height: 70,
+                    borderTopWidth: 0,
+                    // Neumorphism shadow
+                    shadowColor: '#babecc',
+                    shadowOffset: { width: -5, height: -5 },
+                    shadowOpacity: 1,
+                    shadowRadius: 10,
+                    elevation: 10,
                 },
+
+                tabBarLabelStyle: {
+                    fontSize: 11,
+                    fontWeight: '600',
+                    marginTop: 2,
+                    marginBottom: 2,
+                },
+
+                tabBarItemStyle: {
+                    borderRadius: 15,
+                    marginHorizontal: 2,
+                    paddingVertical: 4,
+                },
+
+                // Modern header styling
                 headerShown: useClientOnlyValue(false, true),
                 headerStyle: {
-                    backgroundColor: Colors[colorScheme ?? 'light'].background,
+                    backgroundColor: colors.background,
+                    shadowColor: 'transparent',
+                    elevation: 0,
                 },
-                headerTintColor: Colors[colorScheme ?? 'light'].text,
+                headerTintColor: colors.text,
+                headerTitleStyle: {
+                    fontWeight: '700',
+                    fontSize: 20,
+                },
             }}>
 
             <Tabs.Screen
                 name="map"
                 options={{
                     title: 'Map',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="map" color={color} />,
-                    headerTitle: 'HitchSpot Map',
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon
+                            name={focused ? "map" : "map-o"}
+                            color={color}
+                            focused={focused}
+                        />
+                    ),
+                    headerTitle: '🗺️ Discover Spots',
                 }}
             />
 
@@ -50,17 +99,31 @@ export default function TabLayout() {
                 name="spots"
                 options={{
                     title: 'Spots',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="list" color={color} />,
-                    headerTitle: 'Nearby Spots',
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon
+                            name={focused ? "th-list" : "list-ul"}
+                            color={color}
+                            focused={focused}
+                        />
+                    ),
+                    headerTitle: '📍 Near You',
                 }}
             />
 
             <Tabs.Screen
                 name="add"
                 options={{
-                    title: 'Add Spot',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="plus-circle" color={color} />,
-                    headerTitle: 'Add New Spot',
+                    title: 'Add',
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon
+                            name={focused ? "plus-circle" : "plus"}
+                            color={focused ? '#4CAF50' : color} // Special green color when active
+                            focused={focused}
+                        />
+                    ),
+                    headerTitle: '✨ Share a Spot',
+                    // Special styling for the add button
+                    tabBarActiveTintColor: '#4CAF50',
                 }}
             />
 
@@ -68,8 +131,14 @@ export default function TabLayout() {
                 name="community"
                 options={{
                     title: 'Community',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="users" color={color} />,
-                    headerTitle: 'Community',
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon
+                            name={focused ? "users" : "group"}
+                            color={color}
+                            focused={focused}
+                        />
+                    ),
+                    headerTitle: '👥 Connect',
                 }}
             />
 
@@ -77,8 +146,14 @@ export default function TabLayout() {
                 name="profile"
                 options={{
                     title: 'Profile',
-                    tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
-                    headerTitle: 'My Profile',
+                    tabBarIcon: ({ color, focused }) => (
+                        <TabBarIcon
+                            name={focused ? "user" : "user-o"}
+                            color={color}
+                            focused={focused}
+                        />
+                    ),
+                    headerTitle: '👤 You',
                 }}
             />
 
