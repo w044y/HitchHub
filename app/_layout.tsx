@@ -3,22 +3,36 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
+// Simple auth check
+function useAuthCheck() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate checking auth status
+    setTimeout(() => {
+      setIsAuthenticated(false); // Set to false to show welcome screen
+      setIsLoading(false);
+    }, 1000);
+  }, []);
+
+  return { isAuthenticated, isLoading };
+}
+
 export {
-  // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
+  // Update this to welcome when not authenticated
+  initialRouteName: 'welcome',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -27,33 +41,52 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
+  const { isAuthenticated, isLoading } = useAuthCheck();
+
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
-    if (loaded) {
+    if (loaded && !isLoading) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [loaded, isLoading]);
 
-  if (!loaded) {
+  if (!loaded || isLoading) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return <RootLayoutNav isAuthenticated={isAuthenticated} />;
 }
 
-function RootLayoutNav() {
+function RootLayoutNav({ isAuthenticated }: { isAuthenticated: boolean }) {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          {isAuthenticated ? (
+              // Show main app when authenticated
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          ) : (
+              // Show auth screens when not authenticated
+              <>
+                <Stack.Screen
+                    name="welcome"
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="login"
+                    options={{ headerShown: false }}
+                />
+                <Stack.Screen
+                    name="signup"
+                    options={{ headerShown: false }}
+                />
+              </>
+          )}
+        </Stack>
+      </ThemeProvider>
   );
 }
