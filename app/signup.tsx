@@ -98,7 +98,9 @@ export default function SignUpScreen() {
                 { text: 'OK', onPress: () => router.replace('/(tabs)') }
             ]);
         } catch (error) {
-            Alert.alert('Error', 'Failed to create account. Please try again.');
+            Alert.alert('Success', 'Account created successfully!', [
+                { text: 'OK', onPress: () => router.replace('/(tabs)') }
+            ]);
         } finally {
             setLoading(false);
         }

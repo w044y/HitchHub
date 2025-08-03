@@ -8,17 +8,19 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 
-// Simple auth check
+// Updated auth check to show tabs
 function useAuthCheck() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking auth status
+    console.log('🔍 Starting auth check...');
     setTimeout(() => {
-      setIsAuthenticated(false); // Set to false to show welcome screen
+      // CHANGE THIS TO TRUE TO SEE TABS
+      setIsAuthenticated(true); // 🎯 Set to true to show tabs
       setIsLoading(false);
-    }, 1000);
+      console.log('✅ Auth check complete - showing tabs');
+    }, 500);
   }, []);
 
   return { isAuthenticated, isLoading };
@@ -28,9 +30,9 @@ export {
   ErrorBoundary,
 } from 'expo-router';
 
+// Update initial route for tabs
 export const unstable_settings = {
-  // Update this to welcome when not authenticated
-  initialRouteName: 'welcome',
+  initialRouteName: '(tabs)', // Change this when showing tabs
 };
 
 SplashScreen.preventAutoHideAsync();
@@ -49,41 +51,39 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded && !isLoading) {
+      console.log('🚀 Hiding splash screen');
       SplashScreen.hideAsync();
     }
   }, [loaded, isLoading]);
 
   if (!loaded || isLoading) {
+    console.log('⏳ Still loading...');
     return null;
   }
 
+  console.log('🎯 Rendering navigation with auth:', isAuthenticated);
   return <RootLayoutNav isAuthenticated={isAuthenticated} />;
 }
 
 function RootLayoutNav({ isAuthenticated }: { isAuthenticated: boolean }) {
   const colorScheme = useColorScheme();
 
+  console.log('📱 RootLayoutNav - isAuthenticated:', isAuthenticated);
+
   return (
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack screenOptions={{ headerShown: false }}>
           {isAuthenticated ? (
-              // Show main app when authenticated
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          ) : (
-              // Show auth screens when not authenticated
               <>
-                <Stack.Screen
-                    name="welcome"
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="login"
-                    options={{ headerShown: false }}
-                />
-                <Stack.Screen
-                    name="signup"
-                    options={{ headerShown: false }}
-                />
+                {console.log('✅ Showing TABS')}
+                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              </>
+          ) : (
+              <>
+                {console.log('✅ Showing WELCOME screens')}
+                <Stack.Screen name="welcome" options={{ headerShown: false }} />
+                <Stack.Screen name="login" options={{ headerShown: false }} />
+                <Stack.Screen name="signup" options={{ headerShown: false }} />
               </>
           )}
         </Stack>

@@ -150,7 +150,7 @@ export default function WelcomeScreen() {
 
                     <TouchableOpacity
                         style={styles.secondaryButton}
-                        onPress={() => router.push('/login')}
+                        onPress={() => router.push('/(tabs)')}
                         activeOpacity={0.8}
                     >
                         <Text style={styles.secondaryButtonText}>👋 I Already Have an Account</Text>
