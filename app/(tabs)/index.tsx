@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
+import { Text, View } from '@/components/Themed';
+import { Screen } from '../../components/layout/Screen';
+import { LoadingSpinner} from '../../components/ui/LoadingSpinner';
+import {Card} from '../../components/ui/Card';
 
 export default function TabOneScreen() {
   const [isLoading, setIsLoading] = useState(true);
@@ -43,101 +47,167 @@ export default function TabOneScreen() {
     }
   };
 
-  // Show loading while checking auth
+  // Show loading while checking auth - using new LoadingSpinner component
   if (isLoading) {
     return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2E7D32" />
-          <Text style={styles.loadingText}>Checking authentication...</Text>
-        </View>
+        <LoadingSpinner
+            message="Checking authentication..."
+            color="#2E7D32"
+        />
     );
   }
 
-  // Show main content if authenticated
+  // Show main content if authenticated - using new Screen and Card components
   return (
-      <View style={styles.container}>
-        <Text style={styles.title}>🌍 Welcome to EcoRide!</Text>
-        <Text style={styles.subtitle}>Your sustainable travel companion</Text>
+      <Screen scrollable>
+        {/* Welcome Card */}
+        <Card>
+          <Text style={styles.title}>🌍 Welcome to EcoRide!</Text>
+          <Text style={styles.subtitle}>Your sustainable travel companion</Text>
+        </Card>
 
-        {/* You can add your main dashboard content here */}
-        <View style={styles.dashboardContent}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
-            <Text style={styles.statLabel}>Trips Completed</Text>
+        {/* Quick Actions */}
+        <Card>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.actionButton}>
+              <Text style={styles.actionEmoji}>📍</Text>
+              <Text style={styles.actionText}>Find Spots</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton}>
+              <Text style={styles.actionEmoji}>🚗</Text>
+              <Text style={styles.actionText}>Find Rides</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>245 kg</Text>
-            <Text style={styles.statLabel}>CO₂ Saved</Text>
+        </Card>
+
+        {/* Stats Dashboard - Your existing stats */}
+        <Card>
+          <Text style={styles.sectionTitle}>Your Impact</Text>
+          <View style={styles.dashboardContent}>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>12</Text>
+              <Text style={styles.statLabel}>Trips Completed</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>245 kg</Text>
+              <Text style={styles.statLabel}>CO₂ Saved</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statNumber}>8</Text>
+              <Text style={styles.statLabel}>Countries Visited</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
-            <Text style={styles.statLabel}>Countries Visited</Text>
+        </Card>
+
+        {/* Recent Activity */}
+        <Card>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+          <View style={styles.activityItem}>
+            <Text style={styles.activityEmoji}>✅</Text>
+            <View style={styles.activityContent}>
+              <Text style={styles.activityTitle}>Added new spot: Highway Rest Stop</Text>
+              <Text style={styles.activityTime}>2 hours ago</Text>
+            </View>
           </View>
-        </View>
-      </View>
+          <View style={styles.activityItem}>
+            <Text style={styles.activityEmoji}>🚗</Text>
+            <View style={styles.activityContent}>
+              <Text style={styles.activityTitle}>Completed ride to Berlin</Text>
+              <Text style={styles.activityTime}>Yesterday</Text>
+            </View>
+          </View>
+        </Card>
+      </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: '#2E7D32',
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 40,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#f0f8f0',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  actionEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  actionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2E7D32',
   },
   dashboardContent: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-around',
-    width: '100%',
+    gap: 8,
   },
   statCard: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 15,
     minWidth: '30%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    flex: 1,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2E7D32',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  activityEmoji: {
+    fontSize: 18,
+    marginRight: 12,
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  activityTime: {
+    fontSize: 12,
+    color: '#666',
   },
 });

@@ -68,39 +68,6 @@ export default function TabLayout() {
             />
 
             <Tabs.Screen
-                name="spots"
-                options={{
-                    title: 'Spots',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="list" color={color} focused={focused} />
-                    ),
-                    headerTitle: '📍 Near You',
-                }}
-            />
-
-            <Tabs.Screen
-                name="add"
-                options={{
-                    title: 'Add',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="plus-circle" color={color} focused={focused} />
-                    ),
-                    headerTitle: '✨ Share a Spot',
-                }}
-            />
-
-            <Tabs.Screen
-                name="community"
-                options={{
-                    title: 'Community',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="users" color={color} focused={focused} />
-                    ),
-                    headerTitle: '👥 Connect',
-                }}
-            />
-
-            <Tabs.Screen
                 name="profile"
                 options={{
                     title: 'Profile',

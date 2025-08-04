@@ -12,7 +12,7 @@ import {
 } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { spacing, sustainableColors } from '../theme/theme';
+import { spacing, sustainableColors } from '@/theme/theme';
 
 const { width } = Dimensions.get('window');
 
