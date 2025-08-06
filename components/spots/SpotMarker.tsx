@@ -1,6 +1,8 @@
+// components/map/SpotMarker.tsx
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text } from '../../components/Themed';
+import { View, StyleSheet } from 'react-native';
+import { Marker } from 'react-native-maps';
+import { Text } from '../Themed';
 import { HitchhikingSpot } from '../map/MapView';
 
 interface SpotMarkerProps {
@@ -9,9 +11,13 @@ interface SpotMarkerProps {
     size?: 'small' | 'medium' | 'large';
 }
 
-export function SpotMarker({ spot, onPress, size = 'medium' }: SpotMarkerProps) {
-    const getSpotColor = (safetyRating: string) => {
-        switch (safetyRating) {
+export const SpotMarker: React.FC<SpotMarkerProps> = ({
+                                                          spot,
+                                                          onPress,
+                                                          size = 'medium'
+                                                      }) => {
+    const getSafetyColor = (rating: string) => {
+        switch (rating) {
             case 'high': return '#4CAF50';
             case 'medium': return '#FF9800';
             case 'low': return '#F44336';
@@ -19,7 +25,7 @@ export function SpotMarker({ spot, onPress, size = 'medium' }: SpotMarkerProps) 
         }
     };
 
-    const getSpotIcon = (type: string) => {
+    const getSpotTypeIcon = (type: string) => {
         switch (type) {
             case 'rest_stop': return '🛑';
             case 'gas_station': return '⛽';
@@ -30,11 +36,11 @@ export function SpotMarker({ spot, onPress, size = 'medium' }: SpotMarkerProps) 
         }
     };
 
-    const getSizeStyle = () => {
+    const getMarkerSize = () => {
         switch (size) {
-            case 'small': return { width: 24, height: 24, borderRadius: 12 };
-            case 'large': return { width: 40, height: 40, borderRadius: 20 };
-            default: return { width: 32, height: 32, borderRadius: 16 };
+            case 'small': return { width: 30, height: 30 };
+            case 'large': return { width: 50, height: 50 };
+            default: return { width: 40, height: 40 };
         }
     };
 
@@ -47,29 +53,38 @@ export function SpotMarker({ spot, onPress, size = 'medium' }: SpotMarkerProps) 
     };
 
     return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        <Marker
+            coordinate={spot.coordinates}
+            onPress={onPress}
+            title={spot.name}
+            description={`⭐ ${spot.rating} • 🛡️ ${spot.safetyRating} • ${spot.type.replace('_', ' ')}`}
+        >
             <View style={[
-                styles.marker,
-                getSizeStyle(),
-                { backgroundColor: getSpotColor(spot.safetyRating) }
+                styles.markerContainer,
+                getMarkerSize(),
+                { backgroundColor: getSafetyColor(spot.safetyRating) }
             ]}>
-                <Text style={[styles.icon, { fontSize: getIconSize() }]}>
-                    {getSpotIcon(spot.type)}
+                <Text style={[styles.markerIcon, { fontSize: getIconSize() }]}>
+                    {getSpotTypeIcon(spot.type)}
                 </Text>
-            </View>
 
-            {/* Rating badge */}
-            {spot.rating && (
+                {spot.verified && (
+                    <View style={styles.verifiedBadge}>
+                        <Text style={styles.verifiedIcon}>✓</Text>
+                    </View>
+                )}
+
                 <View style={styles.ratingBadge}>
                     <Text style={styles.ratingText}>⭐{spot.rating}</Text>
                 </View>
-            )}
-        </TouchableOpacity>
+            </View>
+        </Marker>
     );
-}
+};
 
 const styles = StyleSheet.create({
-    marker: {
+    markerContainer: {
+        borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 3,
@@ -80,24 +95,39 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 5,
     },
-    icon: {
+    markerIcon: {
         color: '#ffffff',
+        fontWeight: 'bold',
+    },
+    verifiedBadge: {
+        position: 'absolute',
+        top: -5,
+        right: -5,
+        backgroundColor: '#4CAF50',
+        borderRadius: 8,
+        width: 16,
+        height: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ffffff',
+    },
+    verifiedIcon: {
+        color: '#ffffff',
+        fontSize: 10,
         fontWeight: 'bold',
     },
     ratingBadge: {
         position: 'absolute',
-        top: -8,
-        right: -8,
-        backgroundColor: '#FF6B00',
-        borderRadius: 10,
+        bottom: -8,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        borderRadius: 8,
         paddingHorizontal: 4,
-        paddingVertical: 2,
-        minWidth: 20,
-        alignItems: 'center',
+        paddingVertical: 1,
     },
     ratingText: {
-        fontSize: 8,
         color: '#ffffff',
+        fontSize: 8,
         fontWeight: 'bold',
     },
 });
