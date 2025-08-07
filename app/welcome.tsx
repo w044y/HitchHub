@@ -1,7 +1,10 @@
+// app/welcome.tsx - Updated with terracotta theme
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Dimensions } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '../constants/Colors';
+import { useColorScheme } from '../components/useColorScheme';
 
 const { width } = Dimensions.get('window');
 
@@ -10,6 +13,9 @@ export default function WelcomeScreen() {
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(30)).current;
     const logoScale = useRef(new Animated.Value(0.8)).current;
+
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
 
     useEffect(() => {
         // Start animations when component mounts
@@ -48,9 +54,9 @@ export default function WelcomeScreen() {
                         { transform: [{ scale: logoScale }] }
                     ]}
                 >
-                    <Text style={styles.logoEmoji}>🌍</Text>
-                    <Text style={styles.logoText}>EcoRide</Text>
-                    <Text style={styles.tagline}>Sustainable Travel</Text>
+                    <Text style={styles.logoEmoji}>🏕️</Text>
+                    <Text style={styles.logoText}>HitchHub</Text>
+                    <Text style={styles.tagline}>Your Adventure Starts Here</Text>
                 </Animated.View>
 
                 {/* Animated Main Content */}
@@ -64,11 +70,11 @@ export default function WelcomeScreen() {
                     ]}
                 >
                     <Text style={styles.title}>
-                        Travel Sustainably,{'\n'}Connect Authentically
+                        Hitchhike with{'\n'}Confidence & Community
                     </Text>
                     <Text style={styles.subtitle}>
-                        Join Europe's leading platform for eco-conscious travelers.
-                        Share rides, discover hidden gems, and reduce your carbon footprint.
+                        Join thousands of adventurous travelers sharing rides, discovering amazing spots,
+                        and exploring the world one journey at a time.
                     </Text>
                 </Animated.View>
 
@@ -83,18 +89,18 @@ export default function WelcomeScreen() {
                     ]}
                 >
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>250K+</Text>
-                        <Text style={styles.statLabel}>Travelers</Text>
+                        <Text style={styles.statNumber}>50K+</Text>
+                        <Text style={styles.statLabel}>Hitchhikers</Text>
                     </View>
                     <View style={styles.statSeparator} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>2.5M kg</Text>
-                        <Text style={styles.statLabel}>CO₂ Saved</Text>
+                        <Text style={styles.statNumber}>15K</Text>
+                        <Text style={styles.statLabel}>Spots</Text>
                     </View>
                     <View style={styles.statSeparator} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statNumber}>15K+</Text>
-                        <Text style={styles.statLabel}>Routes</Text>
+                        <Text style={styles.statNumber}>35</Text>
+                        <Text style={styles.statLabel}>Countries</Text>
                     </View>
                 </Animated.View>
 
@@ -111,11 +117,11 @@ export default function WelcomeScreen() {
                     <View style={styles.featureRow}>
                         <View style={styles.featureItem}>
                             <Text style={styles.featureIcon}>🚗</Text>
-                            <Text style={styles.featureText}>Share Rides</Text>
+                            <Text style={styles.featureText}>Find Rides</Text>
                         </View>
                         <View style={styles.featureItem}>
                             <Text style={styles.featureIcon}>📍</Text>
-                            <Text style={styles.featureText}>Find Spots</Text>
+                            <Text style={styles.featureText}>Best Spots</Text>
                         </View>
                     </View>
                     <View style={styles.featureRow}>
@@ -124,8 +130,8 @@ export default function WelcomeScreen() {
                             <Text style={styles.featureText}>Stay Safe</Text>
                         </View>
                         <View style={styles.featureItem}>
-                            <Text style={styles.featureIcon}>🌱</Text>
-                            <Text style={styles.featureText}>Go Green</Text>
+                            <Text style={styles.featureIcon}>🗺️</Text>
+                            <Text style={styles.featureText}>Explore</Text>
                         </View>
                     </View>
                 </Animated.View>
@@ -141,19 +147,21 @@ export default function WelcomeScreen() {
                     ]}
                 >
                     <TouchableOpacity
-                        style={styles.primaryButton}
+                        style={[styles.primaryButton, { backgroundColor: colors.primary }]}
                         onPress={() => router.push('/signup')}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.primaryButtonText}>✨ Start Your Journey</Text>
+                        <Text style={styles.primaryButtonText}>🎒 Start Your Adventure</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={styles.secondaryButton}
+                        style={[styles.secondaryButton, { borderColor: colors.primary }]}
                         onPress={() => router.push('/(tabs)')}
                         activeOpacity={0.8}
                     >
-                        <Text style={styles.secondaryButtonText}>👋 I Already Have an Account</Text>
+                        <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>
+                            👋 I Already Have an Account
+                        </Text>
                     </TouchableOpacity>
                 </Animated.View>
 
@@ -171,7 +179,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#1B5E20', // Dark green base
+        backgroundColor: '#B8541F', // Deep terracotta base
     },
     backgroundLayer1: {
         position: 'absolute',
@@ -179,7 +187,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: '60%',
-        backgroundColor: '#2E7D32', // Medium green
+        backgroundColor: '#D4622A', // Main terracotta
         opacity: 0.9,
     },
     backgroundLayer2: {
@@ -188,7 +196,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: '50%',
-        backgroundColor: '#1B5E20', // Dark green
+        backgroundColor: '#9C4415', // Darker terracotta
         opacity: 0.95,
     },
     content: {
@@ -213,7 +221,7 @@ const styles = StyleSheet.create({
     logoText: {
         fontSize: 36,
         fontWeight: 'bold',
-        color: 'white',
+        color: '#F4F1EC', // Warm off-white
         letterSpacing: 2,
         textShadowColor: 'rgba(0, 0, 0, 0.3)',
         textShadowOffset: { width: 1, height: 1 },
@@ -221,7 +229,7 @@ const styles = StyleSheet.create({
     },
     tagline: {
         fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: 'rgba(244, 241, 236, 0.8)', // Warm off-white with opacity
         letterSpacing: 1,
         marginTop: 4,
     },
@@ -232,7 +240,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: 'white',
+        color: '#F4F1EC', // Warm off-white
         textAlign: 'center',
         marginBottom: 16,
         lineHeight: 34,
@@ -242,7 +250,7 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 16,
-        color: 'rgba(255, 255, 255, 0.9)',
+        color: 'rgba(244, 241, 236, 0.9)', // Warm off-white with opacity
         textAlign: 'center',
         lineHeight: 24,
         paddingHorizontal: 10,
@@ -251,7 +259,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: 'rgba(244, 241, 236, 0.15)', // Warm overlay
         borderRadius: 20,
         paddingVertical: 20,
         marginVertical: 20,
@@ -269,18 +277,18 @@ const styles = StyleSheet.create({
     statNumber: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#81D4FA', // Light blue
+        color: '#E67E22', // Sunset orange for highlights
         marginBottom: 4,
     },
     statLabel: {
         fontSize: 12,
-        color: 'rgba(255, 255, 255, 0.8)',
+        color: 'rgba(244, 241, 236, 0.8)',
         textAlign: 'center',
     },
     statSeparator: {
         width: 1,
         height: 30,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        backgroundColor: 'rgba(244, 241, 236, 0.2)',
     },
     featuresContainer: {
         marginVertical: 20,
@@ -292,7 +300,7 @@ const styles = StyleSheet.create({
     },
     featureItem: {
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(244, 241, 236, 0.1)',
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: 16,
@@ -304,7 +312,7 @@ const styles = StyleSheet.create({
     },
     featureText: {
         fontSize: 12,
-        color: 'white',
+        color: '#F4F1EC',
         fontWeight: '600',
         textAlign: 'center',
     },
@@ -313,7 +321,6 @@ const styles = StyleSheet.create({
         marginTop: 20,
     },
     primaryButton: {
-        backgroundColor: '#4CAF50',
         borderRadius: 16,
         paddingVertical: 18,
         alignItems: 'center',
@@ -326,20 +333,18 @@ const styles = StyleSheet.create({
     primaryButtonText: {
         fontSize: 18,
         fontWeight: '700',
-        color: 'white',
+        color: '#F4F1EC', // Warm off-white
     },
     secondaryButton: {
-        borderColor: 'rgba(255, 255, 255, 0.4)',
         borderWidth: 2,
         borderRadius: 16,
         paddingVertical: 16,
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(244, 241, 236, 0.05)', // Very subtle warm overlay
     },
     secondaryButtonText: {
         fontSize: 16,
         fontWeight: '600',
-        color: 'white',
     },
     legalContainer: {
         marginTop: 20,
@@ -347,7 +352,7 @@ const styles = StyleSheet.create({
     },
     legalText: {
         fontSize: 11,
-        color: 'rgba(255, 255, 255, 0.6)',
+        color: 'rgba(244, 241, 236, 0.6)',
         textAlign: 'center',
         lineHeight: 16,
     },

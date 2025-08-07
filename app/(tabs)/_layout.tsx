@@ -1,80 +1,57 @@
+// app/(tabs)/_layout.tsx - Fixed
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
-
-// Simple tab bar icon
-function TabBarIcon(props: {
-    name: React.ComponentProps<typeof FontAwesome>['name'];
-    color: string;
-    focused: boolean;
-}) {
-    return (
-        <FontAwesome
-            size={props.focused ? 26 : 22}
-            style={{
-                marginBottom: -3,
-                opacity: props.focused ? 1 : 0.7,
-            }}
-            {...props}
-        />
-    );
-}
+import { Text } from 'react-native';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '../../components/useColorScheme';
 
 export default function TabLayout() {
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
+
     return (
         <Tabs
             screenOptions={{
-                // Tab bar styling
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.tabIconDefault,
+                headerShown: false,
                 tabBarStyle: {
-                    backgroundColor: 'white',
+                    backgroundColor: colors.background,
+                    borderTopColor: colors.border,
                     borderTopWidth: 1,
-                    borderTopColor: '#E0E0E0',
-                    height: 60,
-                    paddingBottom: 8,
-                    paddingTop: 8,
                 },
-                tabBarActiveTintColor: '#2E7D32',
-                tabBarInactiveTintColor: '#666',
-                headerShown: true,
-                headerStyle: {
-                    backgroundColor: '#2E7D32',
-                },
-                headerTintColor: 'white',
-                headerTitleStyle: {
-                    fontWeight: 'bold',
-                },
-            }}
-        >
+            }}>
             <Tabs.Screen
                 name="index"
                 options={{
                     title: 'Home',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="home" color={color} focused={focused} />
+                    tabBarIcon: ({ focused, color }) => (
+                        <Text style={{ fontSize: 20, color }}>
+                            {focused ? '🏠' : '🏠'}
+                        </Text>
                     ),
-                    headerTitle: '🏠 EcoRide Home',
                 }}
             />
-
             <Tabs.Screen
                 name="map"
                 options={{
                     title: 'Map',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="map" color={color} focused={focused} />
+                    tabBarIcon: ({ focused, color }) => (
+                        <Text style={{ fontSize: 20, color }}>
+                            {focused ? '🗺️' : '🗺️'}
+                        </Text>
                     ),
-                    headerTitle: '🗺️ Discover Spots',
                 }}
             />
-
             <Tabs.Screen
                 name="profile"
                 options={{
                     title: 'Profile',
-                    tabBarIcon: ({ color, focused }) => (
-                        <TabBarIcon name="user" color={color} focused={focused} />
+                    tabBarIcon: ({ focused, color }) => (
+                        <Text style={{ fontSize: 20, color }}>
+                            {focused ? '👤' : '👤'}
+                        </Text>
                     ),
-                    headerTitle: '👤 You',
                 }}
             />
         </Tabs>

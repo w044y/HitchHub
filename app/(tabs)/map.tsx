@@ -6,6 +6,8 @@ import { Screen } from '../../components/layout/Screen';
 import { HitchhikingMapView, MapViewHandle, HitchhikingSpot } from '../../components/map/MapView';
 import { MapControls } from '../../components/map/MapControls';
 import { Region } from 'react-native-maps';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '../../components/useColorScheme';
 
 // Mock data
 const mockSpots: HitchhikingSpot[] = [
@@ -63,6 +65,8 @@ export default function MapScreen() {
     const [spots] = useState<HitchhikingSpot[]>(mockSpots);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSpot, setSelectedSpot] = useState<HitchhikingSpot | null>(null);
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
 
     const mapRef = useRef<MapViewHandle>(null);
 
@@ -102,17 +106,14 @@ export default function MapScreen() {
 
     const handleMyLocationPress = () => {
         Alert.alert('My Location', 'Centering map on your current location...');
-        // Implementation will center map on user location
     };
 
     const handleFilterPress = () => {
         Alert.alert('Filter', 'Filter spots by safety, type, rating, etc.');
-        // Implementation will show filter modal
     };
 
     const handleSearchPress = () => {
         Alert.alert('Search', 'Search for specific locations or spot types');
-        // Implementation will focus search input
     };
 
     const handleAddSpotPress = () => {
@@ -133,7 +134,6 @@ export default function MapScreen() {
     };
 
     const handleRegionChange = (region: Region) => {
-        // Handle region changes - useful for loading spots in new areas
         console.log('Region changed:', region);
     };
 
@@ -148,9 +148,13 @@ export default function MapScreen() {
             {/* Search Bar */}
             <View style={styles.searchContainer}>
                 <TextInput
-                    style={styles.searchInput}
+                    style={[styles.searchInput, {
+                        backgroundColor: colors.background,
+                        color: colors.text,
+                        borderColor: colors.border
+                    }]}
                     placeholder="Search hitchhiking spots..."
-                    placeholderTextColor="#666"
+                    placeholderTextColor={colors.textSecondary}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
                     autoCorrect={false}
@@ -178,7 +182,7 @@ export default function MapScreen() {
             />
 
             {/* Stats Bar */}
-            <View style={styles.statsBar}>
+            <View style={[styles.statsBar, { backgroundColor: `${colors.primary}F0` }]}>
                 <Text style={styles.statsText}>
                     📍 {filteredSpots.length} spots {searchQuery ? `matching "${searchQuery}"` : 'in area'} •
                     🛡️ {filteredSpots.filter(s => s.safetyRating === 'high').length} high safety •
@@ -201,7 +205,6 @@ const styles = StyleSheet.create({
         zIndex: 1000,
     },
     searchInput: {
-        backgroundColor: '#ffffff',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 12,
@@ -211,22 +214,19 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 8,
         elevation: 4,
-        color: '#333',
         borderWidth: 1,
-        borderColor: '#e0e0e0',
     },
     statsBar: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: 'rgba(46, 125, 50, 0.95)',
         paddingVertical: 12,
         paddingHorizontal: 16,
         zIndex: 1000,
     },
     statsText: {
-        color: '#ffffff',
+        color: '#FFFFFF',
         fontSize: 12,
         textAlign: 'center',
         fontWeight: '500',

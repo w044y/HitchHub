@@ -1,7 +1,9 @@
-// components/map/MapControls.tsx
+// components/map/MapControls.tsx - Updated
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { Text } from '../Themed';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text } from 'react-native';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '../useColorScheme';
 
 interface MapControlsProps {
     onMyLocationPress: () => void;
@@ -18,12 +20,15 @@ export const MapControls: React.FC<MapControlsProps> = ({
                                                             onAddSpotPress,
                                                             style
                                                         }) => {
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
+
     return (
         <View style={[styles.container, style]}>
             {/* Primary Controls */}
             <View style={styles.primaryControls}>
                 <TouchableOpacity
-                    style={[styles.controlButton, styles.primaryButton]}
+                    style={[styles.controlButton, { backgroundColor: colors.primary }]}
                     onPress={onMyLocationPress}
                     activeOpacity={0.8}
                 >
@@ -31,7 +36,7 @@ export const MapControls: React.FC<MapControlsProps> = ({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.controlButton, styles.primaryButton]}
+                    style={[styles.controlButton, { backgroundColor: colors.primary }]}
                     onPress={onAddSpotPress}
                     activeOpacity={0.8}
                 >
@@ -42,19 +47,19 @@ export const MapControls: React.FC<MapControlsProps> = ({
             {/* Secondary Controls */}
             <View style={styles.secondaryControls}>
                 <TouchableOpacity
-                    style={[styles.controlButton, styles.secondaryButton]}
+                    style={[styles.controlButton, styles.secondaryButton, { borderColor: colors.primary }]}
                     onPress={onSearchPress}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.secondaryButtonText}>🔍</Text>
+                    <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>🔍</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={[styles.controlButton, styles.secondaryButton]}
+                    style={[styles.controlButton, styles.secondaryButton, { borderColor: colors.primary }]}
                     onPress={onFilterPress}
                     activeOpacity={0.8}
                 >
-                    <Text style={styles.secondaryButtonText}>⚙️</Text>
+                    <Text style={[styles.secondaryButtonText, { color: colors.primary }]}>⚙️</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -87,13 +92,9 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 4,
     },
-    primaryButton: {
-        backgroundColor: '#2E7D32',
-    },
     secondaryButton: {
         backgroundColor: '#ffffff',
         borderWidth: 2,
-        borderColor: '#2E7D32',
     },
     primaryButtonText: {
         fontSize: 20,
@@ -101,6 +102,5 @@ const styles = StyleSheet.create({
     },
     secondaryButtonText: {
         fontSize: 18,
-        color: '#2E7D32',
     },
 });

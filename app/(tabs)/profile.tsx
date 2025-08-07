@@ -1,8 +1,9 @@
+// app/(tabs)/profile.tsx
 import React from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Text, View } from '@/components/Themed';
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '../../components/useColorScheme';
 import { router } from 'expo-router';
 
 const mockUser = {
@@ -29,7 +30,7 @@ export default function ProfileScreen() {
                 {
                     text: 'Logout',
                     style: 'destructive',
-                    onPress: () => router.replace('../auth/login')
+                    onPress: () => Alert.alert('Logout', 'Logout functionality coming soon!')
                 }
             ]
         );
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
     return (
         <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
             {/* Profile Header */}
-            <View style={[styles.profileHeader, { backgroundColor: colors.inputBackground }]}>
+            <View style={[styles.profileHeader, { backgroundColor: colors.backgroundSecondary }]}>
                 <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
                     <Text style={styles.avatarText}>AT</Text>
                 </View>
@@ -74,114 +75,49 @@ export default function ProfileScreen() {
             <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Actions</Text>
 
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>📍</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>My Spots</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            View and manage your added spots
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>❤️</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Saved Spots</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Your favorite hitchhiking locations
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>🗺️</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Trip History</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Track your hitchhiking journeys
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
+                {[
+                    { icon: '📍', title: 'My Spots', subtitle: 'View and manage your added spots' },
+                    { icon: '❤️', title: 'Saved Spots', subtitle: 'Your favorite hitchhiking locations' },
+                    { icon: '🗺️', title: 'Trip History', subtitle: 'Track your hitchhiking journeys' },
+                ].map((action, index) => (
+                    <TouchableOpacity
+                        key={index}
+                        style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}
+                        onPress={() => Alert.alert(action.title, 'Feature coming soon!')}
+                    >
+                        <Text style={styles.actionIcon}>{action.icon}</Text>
+                        <View style={styles.actionContent}>
+                            <Text style={[styles.actionTitle, { color: colors.text }]}>{action.title}</Text>
+                            <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>{action.subtitle}</Text>
+                        </View>
+                        <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
+                    </TouchableOpacity>
+                ))}
             </View>
 
             {/* Settings */}
             <View style={styles.section}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Settings</Text>
 
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>👤</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Edit Profile</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Update your personal information
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>🔔</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Notifications</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Manage notification preferences
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>🛡️</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Privacy & Safety</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Control your privacy settings
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>❓</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Help & Support</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Get help and contact support
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* About */}
-            <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>About</Text>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>⭐</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Rate HitchSpot</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Help us improve the app
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={styles.actionIcon}>📄</Text>
-                    <View style={styles.actionContent}>
-                        <Text style={[styles.actionTitle, { color: colors.text }]}>Terms & Privacy</Text>
-                        <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>
-                            Legal information
-                        </Text>
-                    </View>
-                    <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
-                </TouchableOpacity>
+                {[
+                    { icon: '👤', title: 'Edit Profile', subtitle: 'Update your personal information' },
+                    { icon: '🔔', title: 'Notifications', subtitle: 'Manage notification preferences' },
+                    { icon: '🛡️', title: 'Privacy & Safety', subtitle: 'Control your privacy settings' },
+                    { icon: '❓', title: 'Help & Support', subtitle: 'Get help and contact support' },
+                ].map((setting, index) => (
+                    <TouchableOpacity
+                        key={index}
+                        style={[styles.actionItem, { backgroundColor: colors.background, borderColor: colors.border }]}
+                        onPress={() => Alert.alert(setting.title, 'Feature coming soon!')}
+                    >
+                        <Text style={styles.actionIcon}>{setting.icon}</Text>
+                        <View style={styles.actionContent}>
+                            <Text style={[styles.actionTitle, { color: colors.text }]}>{setting.title}</Text>
+                            <Text style={[styles.actionSubtitle, { color: colors.textSecondary }]}>{setting.subtitle}</Text>
+                        </View>
+                        <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
+                    </TouchableOpacity>
+                ))}
             </View>
 
             {/* Logout */}
@@ -194,7 +130,7 @@ export default function ProfileScreen() {
 
             {/* Version */}
             <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-                HitchSpot v1.0.0
+                HitchHub v1.0.0
             </Text>
         </ScrollView>
     );
