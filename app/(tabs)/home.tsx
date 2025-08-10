@@ -1,4 +1,4 @@
-// app/(tabs)/index.tsx - Aligned styling
+// app/(tabs)/home.tsx - Aligned styling
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import {TouchableOpacity, StyleSheet, Alert, Platform} from 'react-native';
@@ -8,7 +8,7 @@ import { LoadingSpinner} from '../../components/ui/LoadingSpinner';
 import {Card} from '../../components/ui/Card';
 import { Colors } from '../../constants/Colors';
 import { Layout } from '../../constants/Layout';
-import { useColorScheme } from '@/components/useColorScheme';
+import { useColorScheme } from '../../components/useColorScheme';
 
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
@@ -40,7 +40,7 @@ export default function HomeScreen() {
   };
 
   const handleFindSpots = () => {
-    router.push('/(tabs)/map');
+    router.push('/(tabs)/trips');
   };
 
   const handleFindRides = () => {

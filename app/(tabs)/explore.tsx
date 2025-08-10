@@ -1,4 +1,4 @@
-// app/(tabs)/map.tsx
+// app/(tabs)/explore.tsx
 import React, { useState, useRef } from 'react';
 import { View, StyleSheet, TextInput, Alert } from 'react-native';
 import { Text } from '../../components/Themed';

@@ -1,14 +1,21 @@
-// app/(tabs)/_layout.tsx - Enhanced with consistent styling
+// app/(tabs)/_layout.tsx - Add error handling
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Text } from 'react-native';
-import { Colors } from '../../constants/Colors';
-import { useColorScheme } from '../../components/useColorScheme';
-import { Layout } from '../../constants/Layout';
+import { Text, View } from 'react-native';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/components/useColorScheme';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
-    const colors = Colors[colorScheme ?? 'light'];
+
+    // Fallback colors in case Colors is undefined
+    const colors = Colors?.[colorScheme ?? 'light'] ?? {
+        primary: '#D4622A',
+        background: '#FFFFFF',
+        border: '#E5E7EB',
+        tabIconDefault: '#9CA3AF',
+        backgroundSecondary: '#F8F9FA'
+    };
 
     return (
         <Tabs
@@ -22,43 +29,77 @@ export default function TabLayout() {
                     borderTopWidth: 1,
                     paddingBottom: 4,
                     paddingTop: 4,
-                    height: 60,
+                    height: 65,
                 },
                 tabBarLabelStyle: {
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: '500',
                 },
             }}>
+
             <Tabs.Screen
-                name="index"
+                name="home"
                 options={{
                     title: 'Home',
-                    tabBarIcon: ({ focused, color }) => (
-                        <Text style={{ fontSize: 24, color }}>
-                            {focused ? '🏠' : '🏠'}
-                        </Text>
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ fontSize: 22, color }}>🏠</Text>
                     ),
                 }}
             />
+
             <Tabs.Screen
-                name="map"
+                name="trips"
                 options={{
-                    title: 'Map',
-                    tabBarIcon: ({ focused, color }) => (
-                        <Text style={{ fontSize: 24, color }}>
-                            {focused ? '🗺️' : '🗺️'}
-                        </Text>
+                    title: 'Trips',
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ fontSize: 22, color }}>🎒</Text>
                     ),
                 }}
             />
+
             <Tabs.Screen
-                name="profile"
+                name="explore"
                 options={{
-                    title: 'Profile',
+                    title: 'Explore',
                     tabBarIcon: ({ focused, color }) => (
-                        <Text style={{ fontSize: 24, color }}>
-                            {focused ? '👤' : '👤'}
-                        </Text>
+                        <View style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: 25,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: -10,
+                            backgroundColor: focused ? colors.primary : colors.backgroundSecondary,
+                            borderWidth: 2,
+                            borderColor: '#FFFFFF',
+                        }}>
+                            <Text style={{
+                                fontSize: 24,
+                                color: focused ? '#FFFFFF' : color
+                            }}>
+                                🗺️
+                            </Text>
+                        </View>
+                    ),
+                }}
+            />
+
+            <Tabs.Screen
+                name="community"
+                options={{
+                    title: 'Community',
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ fontSize: 22, color }}>🌱</Text>
+                    ),
+                }}
+            />
+
+            <Tabs.Screen
+                name="you"
+                options={{
+                    title: 'You',
+                    tabBarIcon: ({ color }) => (
+                        <Text style={{ fontSize: 22, color }}>👤</Text>
                     ),
                 }}
             />

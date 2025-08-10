@@ -1,7 +1,7 @@
-// app/(tabs)/profile.tsx - Aligned styling
+// app/(tabs)/you.tsx - Aligned styling
 import React from 'react';
 import { StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
-import { Text, View } from '@/components/Themed';
+import { Text, View } from '../../components/Themed';
 import { Colors } from '../../constants/Colors';
 import { Layout } from '../../constants/Layout';
 import { useColorScheme } from '../../components/useColorScheme';
