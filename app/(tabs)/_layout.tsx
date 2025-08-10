@@ -2,7 +2,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Text, View } from 'react-native';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
 
 export default function TabLayout() {
