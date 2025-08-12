@@ -1,14 +1,37 @@
-// app/(tabs)/_layout.tsx - Add error handling
-import React from 'react';
+// app/(tabs)/_layout.tsx
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
+import { router } from 'expo-router';
 import { Text, View } from 'react-native';
-import { Colors } from '../../constants/Colors';
+import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
+    const { isAuthenticated, isLoading } = useAuth();
 
-    // Fallback colors in case Colors is undefined
+    // Redirect to auth if not logged in
+    useEffect(() => {
+        if (!isLoading && !isAuthenticated) {
+            router.replace('/auth/login');
+        }
+    }, [isAuthenticated, isLoading]);
+
+    // Show loading while checking auth
+    if (isLoading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Text>Loading...</Text>
+            </View>
+        );
+    }
+
+    // Don't render tabs if not authenticated
+    if (!isAuthenticated) {
+        return null;
+    }
+
     const colors = Colors?.[colorScheme ?? 'light'] ?? {
         primary: '#D4622A',
         background: '#FFFFFF',

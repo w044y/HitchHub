@@ -10,7 +10,7 @@ export default function NotFoundScreen() {
       <View style={styles.container}>
 
 
-        <Link href="/" style={styles.link}>
+        <Link href='/'style={styles.link}>
         </Link>
       </View>
     </>
