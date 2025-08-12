@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 const getApiBaseUrl = () => {
     if (__DEV__) {
         // Replace with YOUR computer's IP address
-        const YOUR_COMPUTER_IP = '192.168.11.16'; // Your current IP
+        const YOUR_COMPUTER_IP = ''; // Your current IP
         return `http://${YOUR_COMPUTER_IP}:3000/api/v1`;
     }
     return 'https://your-production-url.com/api/v1';
