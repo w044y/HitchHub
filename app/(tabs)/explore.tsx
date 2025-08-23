@@ -1,5 +1,5 @@
 // app/(tabs)/explore.tsx - Much cleaner version
-import React, { useState, useRef } from 'react';
+import React, {useState, useRef, useEffect} from 'react';
 import { View, StyleSheet, TextInput, Alert, Platform } from 'react-native';
 import { Text } from '../../components/Themed';
 import { Screen } from '../../components/layout/Screen';
@@ -9,67 +9,56 @@ import { Region } from 'react-native-maps';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../components/useColorScheme';
 import { router } from 'expo-router';
+import {apiClient} from "@/app/services/api";
 
-// Keep your existing mock data
-const mockSpots: HitchhikingSpot[] = [
-    {
-        id: '1',
-        name: 'Highway A1 Rest Stop',
-        type: 'rest_stop',
-        coordinates: { latitude: 52.5250, longitude: 13.4100 },
-        rating: 4.5,
-        safetyRating: 'high',
-        description: 'Great visibility, friendly drivers, well-lit parking area with facilities',
-        addedBy: 'TravelMike',
-        lastUpdated: '2 hours ago',
-        verified: true,
-    },
-    {
-        id: '2',
-        name: 'Berlin Bridge Exit',
-        type: 'bridge',
-        coordinates: { latitude: 52.5150, longitude: 13.3950 },
-        rating: 4.2,
-        safetyRating: 'high',
-        description: 'Good spot for rides heading south, safe pedestrian area',
-        addedBy: 'RoadWanderer',
-        lastUpdated: '1 day ago',
-        verified: true,
-    },
-    {
-        id: '3',
-        name: 'Gas Station Junction',
-        type: 'gas_station',
-        coordinates: { latitude: 52.5300, longitude: 13.4200 },
-        rating: 3.8,
-        safetyRating: 'medium',
-        description: 'Busy gas station, ask drivers inside, moderate safety',
-        addedBy: 'HitchPro',
-        lastUpdated: '3 days ago',
-        verified: false,
-    },
-    {
-        id: '4',
-        name: 'Highway Entrance Ramp',
-        type: 'highway_entrance',
-        coordinates: { latitude: 52.5100, longitude: 13.3800 },
-        rating: 4.7,
-        safetyRating: 'high',
-        description: 'Perfect for long-distance rides, excellent visibility',
-        addedBy: 'EuroTraveler',
-        lastUpdated: '5 hours ago',
-        verified: true,
-    },
-];
+
 
 export default function MapScreen() {
-    const [spots] = useState<HitchhikingSpot[]>(mockSpots);
+    const [spots, setSpots] = useState<HitchhikingSpot[]>([]); // Start with empty array
+
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSpot, setSelectedSpot] = useState<HitchhikingSpot | null>(null);
+    const [isLoading, setIsLoading] = useState(true); // Add loading state
+
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
 
     const mapRef = useRef<MapViewHandle>(null);
+
+    useEffect(() => {
+        fetchSpots();
+    }, []);
+    const fetchSpots = async () => {
+        try {
+            console.log('🔍 Fetching spots from API...');
+            const response = await apiClient.getSpots({ limit: 100 });
+
+            // Convert API response to HitchhikingSpot format
+            const convertedSpots: HitchhikingSpot[] = response.data.map((apiSpot: any) => ({
+                id: apiSpot.id,
+                name: apiSpot.name,
+                type: apiSpot.spot_type,
+                coordinates: {
+                    latitude: parseFloat(apiSpot.latitude),
+                    longitude: parseFloat(apiSpot.longitude)
+                },
+                rating: apiSpot.overall_rating || 0,
+                safetyRating: apiSpot.safety_rating > 4 ? 'high' : apiSpot.safety_rating > 2.5 ? 'medium' : 'low',
+                description: apiSpot.description,
+                addedBy: apiSpot.created_by?.display_name || 'Unknown',
+                lastUpdated: new Date(apiSpot.created_at).toLocaleDateString(),
+                verified: apiSpot.is_verified || false,
+            }));
+
+            setSpots(convertedSpots);
+            console.log(`✅ Loaded ${convertedSpots.length} spots from API`);
+        } catch (error) {
+            console.error('❌ Error fetching spots:', error);
+            Alert.alert('Error', 'Could not load spots from server');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const handleSpotPress = (spot: HitchhikingSpot) => {
         setSelectedSpot(spot);
