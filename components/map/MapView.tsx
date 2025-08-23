@@ -121,8 +121,11 @@ export const HitchhikingMapView = forwardRef<MapViewHandle, HitchhikingMapViewPr
         };
 
         const handleMapPress = (event: MapPressEvent) => {
+            console.log('🗺️ Map pressed!', event.nativeEvent); // Add this for debugging
+
             if (onMapPress) {
                 const { coordinate } = event.nativeEvent;
+                console.log('📍 Coordinate:', coordinate); // Add this for debugging
                 onMapPress(coordinate);
             }
         };

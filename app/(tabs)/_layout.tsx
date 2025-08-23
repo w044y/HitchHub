@@ -1,36 +1,12 @@
-// app/(tabs)/_layout.tsx
-import React, { useEffect } from 'react';
+// app/(tabs)/_layout.tsx - Remove auth redirect
+import React from 'react';
 import { Tabs } from 'expo-router';
-import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useAuth } from '../contexts/AuthContext';
 
 export default function TabLayout() {
     const colorScheme = useColorScheme();
-    const { isAuthenticated, isLoading } = useAuth();
-
-    // Redirect to auth if not logged in
-    useEffect(() => {
-        if (!isLoading && !isAuthenticated) {
-            router.replace('/auth/login');
-        }
-    }, [isAuthenticated, isLoading]);
-
-    // Show loading while checking auth
-    if (isLoading) {
-        return (
-            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text>Loading...</Text>
-            </View>
-        );
-    }
-
-    // Don't render tabs if not authenticated
-    if (!isAuthenticated) {
-        return null;
-    }
 
     const colors = Colors?.[colorScheme ?? 'light'] ?? {
         primary: '#D4622A',
@@ -124,6 +100,15 @@ export default function TabLayout() {
                     tabBarIcon: ({ color }) => (
                         <Text style={{ fontSize: 22, color }}>👤</Text>
                     ),
+                }}
+            />
+
+            {/* Hidden add spot screen */}
+            <Tabs.Screen
+                name="add-spot"
+                options={{
+                    title: 'Add Spot',
+                    href: null, // Hide from tab bar
                 }}
             />
         </Tabs>

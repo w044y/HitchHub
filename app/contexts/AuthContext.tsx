@@ -1,6 +1,5 @@
+// app/contexts/AuthContext.tsx - Simplified version
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { apiClient } from '../services/api';
 
 interface User {
     id: string;
@@ -26,91 +25,46 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'user_data';
-
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        checkStoredAuth();
+        // Simulate auth check and auto-login
+        setTimeout(() => {
+            const mockUser: User = {
+                id: 'mock-user-123',
+                email: 'dev@vendro.app',
+                username: 'devuser',
+                display_name: 'Dev User',
+                vendro_points: 100,
+                safety_rating: 4.5,
+                is_verified: true,
+                created_at: new Date().toISOString(),
+            };
+
+            setUser(mockUser);
+            setIsLoading(false);
+            console.log('🔓 Auth disabled - auto-logged in as dev user');
+        }, 500); // Short delay to simulate loading
     }, []);
 
-    const checkStoredAuth = async () => {
-        try {
-            const token = await AsyncStorage.getItem(TOKEN_KEY);
-            const userData = await AsyncStorage.getItem(USER_KEY);
-
-            if (token && userData) {
-                apiClient.setToken(token);
-                setUser(JSON.parse(userData));
-
-                // Verify token is still valid
-                try {
-                    const response = await apiClient.getCurrentUser();
-                    setUser(response.data);
-                } catch (error) {
-                    console.log('Token expired, clearing auth');
-                    await clearAuth();
-                }
-            }
-        } catch (error) {
-            console.error('Error checking stored auth:', error);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
+    // Mock functions (no-op)
     const sendMagicLink = async (email: string) => {
-        try {
-            await apiClient.sendMagicLink(email);
-        } catch (error) {
-            throw error;
-        }
+        console.log('📧 Mock: Magic link sent to', email);
     };
 
     const verifyMagicLink = async (token: string, email: string) => {
-        try {
-            const response = await apiClient.verifyMagicLink(token, email);
-
-            console.log('🔍 Auth response:', response);
-
-            // Now response.data contains { user, accessToken, message }
-            await AsyncStorage.setItem(TOKEN_KEY, response.data.accessToken);
-            await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-
-            apiClient.setToken(response.data.accessToken);
-            setUser(response.data.user);
-        } catch (error) {
-            throw error;
-        }
+        console.log('✅ Mock: Magic link verified');
     };
 
     const logout = async () => {
-        try {
-            await apiClient.logout();
-        } catch (error) {
-            console.log('Logout API error (continuing anyway):', error);
-        } finally {
-            await clearAuth();
-        }
-    };
-
-    const clearAuth = async () => {
-        await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-        apiClient.setToken(null);
+        console.log('👋 Mock: Logged out');
         setUser(null);
     };
 
     const refreshUser = async () => {
-        try {
-            const response = await apiClient.getCurrentUser();
-            setUser(response.data);
-            await AsyncStorage.setItem(USER_KEY, JSON.stringify(response.data));
-        } catch (error) {
-            console.error('Error refreshing user:', error);
-        }
+        console.log('🔄 Mock: User refreshed');
     };
 
     return (
@@ -118,7 +72,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             value={{
                 user,
                 isLoading,
-                isAuthenticated: !!user,
+                isAuthenticated: true, // Always authenticated in dev mode
                 sendMagicLink,
                 verifyMagicLink,
                 logout,

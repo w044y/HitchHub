@@ -1,4 +1,4 @@
-// components/map/MapControls.tsx - Updated
+// components/map/MapControls.tsx - Simplified version
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Text } from 'react-native';
@@ -9,7 +9,6 @@ interface MapControlsProps {
     onMyLocationPress: () => void;
     onFilterPress: () => void;
     onSearchPress: () => void;
-    onAddSpotPress: () => void;
     style?: any;
 }
 
@@ -17,7 +16,6 @@ export const MapControls: React.FC<MapControlsProps> = ({
                                                             onMyLocationPress,
                                                             onFilterPress,
                                                             onSearchPress,
-                                                            onAddSpotPress,
                                                             style
                                                         }) => {
     const colorScheme = useColorScheme();
@@ -33,14 +31,6 @@ export const MapControls: React.FC<MapControlsProps> = ({
                     activeOpacity={0.8}
                 >
                     <Text style={styles.primaryButtonText}>📍</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.controlButton, { backgroundColor: colors.primary }]}
-                    onPress={onAddSpotPress}
-                    activeOpacity={0.8}
-                >
-                    <Text style={styles.primaryButtonText}>➕</Text>
                 </TouchableOpacity>
             </View>
 

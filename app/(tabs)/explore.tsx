@@ -1,6 +1,6 @@
-// app/(tabs)/explore.tsx
+// app/(tabs)/explore.tsx - Much cleaner version
 import React, { useState, useRef } from 'react';
-import { View, StyleSheet, TextInput, Alert } from 'react-native';
+import { View, StyleSheet, TextInput, Alert, Platform } from 'react-native';
 import { Text } from '../../components/Themed';
 import { Screen } from '../../components/layout/Screen';
 import { HitchhikingMapView, MapViewHandle, HitchhikingSpot } from '../../components/map/MapView';
@@ -8,8 +8,9 @@ import { MapControls } from '../../components/map/MapControls';
 import { Region } from 'react-native-maps';
 import { Colors } from '../../constants/Colors';
 import { useColorScheme } from '../../components/useColorScheme';
+import { router } from 'expo-router';
 
-// Mock data
+// Keep your existing mock data
 const mockSpots: HitchhikingSpot[] = [
     {
         id: '1',
@@ -72,7 +73,6 @@ export default function MapScreen() {
 
     const handleSpotPress = (spot: HitchhikingSpot) => {
         setSelectedSpot(spot);
-
         Alert.alert(
             `${spot.name} ${spot.verified ? '✓' : ''}`,
             `${spot.description}\n\n⭐ Rating: ${spot.rating}/5\n🛡️ Safety: ${spot.safetyRating}\n📍 Type: ${spot.type.replace('_', ' ')}\n👤 Added by: ${spot.addedBy}\n🕒 Updated: ${spot.lastUpdated}`,
@@ -83,25 +83,70 @@ export default function MapScreen() {
                 },
                 {
                     text: 'Details',
-                    onPress: () => handleSpotDetails(spot)
+                    onPress: () => router.push({
+                        pathname: '/spots/[id]',
+                        params: { id: spot.id }
+                    })
                 },
                 { text: 'Close', style: 'cancel' }
             ]
         );
     };
 
+    // NEW: Simple map press handler - always available
     const handleMapPress = (coordinate: { latitude: number; longitude: number }) => {
+        console.log('🗺️ Map tapped at:', coordinate);
+
+        // Check if user tapped near an existing spot (within ~100m)
+        const isNearExistingSpot = spots.some(spot => {
+            const distance = getDistanceBetweenPoints(
+                coordinate.latitude,
+                coordinate.longitude,
+                spot.coordinates.latitude,
+                spot.coordinates.longitude
+            );
+            return distance < 100; // 100 meters
+        });
+
+        if (isNearExistingSpot) {
+            // Too close to existing spot, don't offer to add
+            console.log('🚫 Too close to existing spot');
+            return;
+        }
+
+        // Show add spot option immediately
         Alert.alert(
-            'Add New Hitchhiking Spot',
+            '📍 Add Hitchhiking Spot',
             `Add a new spot at this location?\n\nLatitude: ${coordinate.latitude.toFixed(6)}\nLongitude: ${coordinate.longitude.toFixed(6)}`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Add Spot',
-                    onPress: () => handleAddSpot(coordinate)
+                    text: '✅ Add Spot',
+                    onPress: () => {
+                        console.log('✅ Navigating to add spot with coordinates:', coordinate);
+                        router.push({
+                            pathname: '/spots/add',
+                            params: {
+                                latitude: coordinate.latitude.toString(),
+                                longitude: coordinate.longitude.toString(),
+                            }
+                        });
+                    }
                 }
             ]
         );
+    };
+
+    // Helper function to calculate distance between two points
+    const getDistanceBetweenPoints = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+        const R = 6371000; // Earth's radius in meters
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng/2) * Math.sin(dLng/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c; // Distance in meters
     };
 
     const handleMyLocationPress = () => {
@@ -116,21 +161,9 @@ export default function MapScreen() {
         Alert.alert('Search', 'Search for specific locations or spot types');
     };
 
-    const handleAddSpotPress = () => {
-        Alert.alert('Add Spot', 'Tap anywhere on the map to add a new hitchhiking spot!');
-    };
-
     const handleNavigateToSpot = (spot: HitchhikingSpot) => {
         mapRef.current?.animateToCoordinate(spot.coordinates);
         Alert.alert('Navigation', `Opening navigation to ${spot.name}`);
-    };
-
-    const handleSpotDetails = (spot: HitchhikingSpot) => {
-        Alert.alert('Spot Details', 'Opening detailed view with photos, reviews, and tips');
-    };
-
-    const handleAddSpot = (coordinate: { latitude: number; longitude: number }) => {
-        Alert.alert('Coming Soon', `Add spot feature will be implemented.\n\nLocation: ${coordinate.latitude.toFixed(6)}, ${coordinate.longitude.toFixed(6)}`);
     };
 
     const handleRegionChange = (region: Region) => {
@@ -162,7 +195,7 @@ export default function MapScreen() {
                 />
             </View>
 
-            {/* Map */}
+            {/* Map - Always fully visible and interactive */}
             <HitchhikingMapView
                 ref={mapRef}
                 style={styles.map}
@@ -173,20 +206,20 @@ export default function MapScreen() {
                 showUserLocation={true}
             />
 
-            {/* Map Controls */}
+            {/* Simplified Map Controls - No add button needed */}
             <MapControls
                 onMyLocationPress={handleMyLocationPress}
                 onFilterPress={handleFilterPress}
                 onSearchPress={handleSearchPress}
-                onAddSpotPress={handleAddSpotPress}
             />
 
-            {/* Stats Bar */}
+            {/* Enhanced Stats Bar with Tap-to-Add Hint */}
             <View style={[styles.statsBar, { backgroundColor: `${colors.primary}F0` }]}>
                 <Text style={styles.statsText}>
                     📍 {filteredSpots.length} spots {searchQuery ? `matching "${searchQuery}"` : 'in area'} •
                     🛡️ {filteredSpots.filter(s => s.safetyRating === 'high').length} high safety •
-                    ✓ {filteredSpots.filter(s => s.verified).length} verified
+                    ✓ {filteredSpots.filter(s => s.verified).length} verified •
+                    💡 Tap empty area to add spot
                 </Text>
             </View>
         </Screen>
