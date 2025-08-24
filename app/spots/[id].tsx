@@ -1,4 +1,4 @@
-// app/spots/[id].tsx - Complete spot details screen
+// app/spots/[id].tsx - Updated with multi-modal reviews
 import React, { useState, useEffect } from 'react';
 import {
     View,
@@ -21,6 +21,28 @@ import { Layout } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
 import { apiClient } from '@/app/services/api';
 
+// Add transport mode types
+enum TransportMode {
+    HITCHHIKING = 'hitchhiking',
+    CYCLING = 'cycling',
+    VAN_LIFE = 'van_life',
+    WALKING = 'walking'
+}
+
+const TRANSPORT_MODE_LABELS = {
+    [TransportMode.HITCHHIKING]: 'Hitchhiking',
+    [TransportMode.CYCLING]: 'Cycling',
+    [TransportMode.VAN_LIFE]: 'Van Life',
+    [TransportMode.WALKING]: 'Walking'
+};
+
+const TRANSPORT_MODE_EMOJIS = {
+    [TransportMode.HITCHHIKING]: '👍',
+    [TransportMode.CYCLING]: '🚲',
+    [TransportMode.VAN_LIFE]: '🚐',
+    [TransportMode.WALKING]: '🚶'
+};
+
 interface SpotDetail {
     id: string;
     name: string;
@@ -35,23 +57,38 @@ interface SpotDetail {
     facilities: string[];
     tips: string;
     accessibility_info: string;
+    transport_modes: TransportMode[];
+    mode_ratings: any;
+    total_reviews: number;
+    last_reviewed: string;
     created_by: {
         id: string;
         display_name: string;
         username: string;
         safety_rating: number;
     };
-    reviews: Array<{
-        id: string;
-        safety_rating: number;
-        overall_rating: number;
-        comment: string;
-        created_at: string;
-        user: {
-            display_name: string;
-        };
-    }>;
     created_at: string;
+}
+
+interface Review {
+    id: string;
+    transport_mode: TransportMode;
+    safety_rating: number;
+    effectiveness_rating: number;
+    overall_rating: number;
+    comment?: string;
+    wait_time_minutes?: number;
+    legal_status?: number;
+    facility_rating?: number;
+    accessibility_rating?: number;
+    location_verified: boolean;
+    distance_from_spot?: number;
+    created_at: string;
+    user: {
+        display_name: string;
+        username: string;
+        safety_rating: number;
+    };
 }
 
 export default function SpotDetailScreen() {
@@ -60,74 +97,160 @@ export default function SpotDetailScreen() {
     const colors = Colors[colorScheme ?? 'light'];
 
     const [spot, setSpot] = useState<SpotDetail | null>(null);
+    const [reviews, setReviews] = useState<Review[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activePhotoIndex, setActivePhotoIndex] = useState(0);
+    const [isLoadingReviews, setIsLoadingReviews] = useState(false);
+    const [selectedTransportMode, setSelectedTransportMode] = useState<TransportMode | 'all'>('all');
 
     useEffect(() => {
         if (id) {
-            fetchSpotDetails();
+            fetchSpotData();
         }
     }, [id]);
 
-    const fetchSpotDetails = async () => {
-        try {
-            // For now, use mock data since your API might not be fully set up
-            // TODO: Replace with real API call when backend is ready
-            // const response = await apiClient.getSpotById(id!);
-            // setSpot(response.data);
+    useEffect(() => {
+        if (id && spot) {
+            fetchReviews();
+        }
+    }, [id, selectedTransportMode, spot]);
 
-            // Mock data for development
-            const mockSpotDetail: SpotDetail = {
-                id: id!,
-                name: 'Highway A1 Rest Stop',
-                description: 'Great visibility, friendly drivers, well-lit parking area with facilities. This is one of the best spots for hitchhiking in the Berlin area.',
-                spot_type: 'rest_stop',
-                latitude: 52.5250,
-                longitude: 13.4100,
-                safety_rating: 4.5,
-                overall_rating: 4.3,
-                is_verified: true,
-                photo_urls: [
-                    'https://via.placeholder.com/400x300/4CAF50/FFFFFF?text=Rest+Stop+1',
-                    'https://via.placeholder.com/400x300/2196F3/FFFFFF?text=Rest+Stop+2',
-                ],
-                facilities: ['restroom', 'food', 'parking', 'wifi'],
-                tips: 'Best time is early morning (6-9 AM) when commuters are heading to work. Stand near the blue information sign for maximum visibility.',
-                accessibility_info: 'Wheelchair accessible, paved walkways',
-                created_by: {
-                    id: 'user1',
-                    display_name: 'Travel Mike',
-                    username: 'travelmike',
-                    safety_rating: 4.8,
-                },
-                reviews: [
-                    {
-                        id: 'review1',
-                        safety_rating: 5,
-                        overall_rating: 4,
-                        comment: 'Excellent spot! Got a ride in 20 minutes. Very safe and well-lit.',
-                        created_at: '2025-08-20T10:30:00Z',
-                        user: { display_name: 'Sarah Explorer' }
-                    },
-                    {
-                        id: 'review2',
-                        safety_rating: 4,
-                        overall_rating: 5,
-                        comment: 'Perfect location with great facilities. Drivers are friendly here.',
-                        created_at: '2025-08-19T15:45:00Z',
-                        user: { display_name: 'Road Wanderer' }
-                    }
-                ],
-                created_at: '2025-08-15T08:00:00Z'
+    // app/spots/[id].tsx - Fix all rating displays
+    const fetchSpotData = async () => {
+        try {
+            console.log('🔍 Fetching spot details for ID:', id);
+
+            const spotResponse = await apiClient.getSpotById(id!);
+
+            // Fix ALL the numeric fields when setting the spot
+            const spotData = {
+                ...spotResponse.data,
+                overall_rating: parseFloat(spotResponse.data.overall_rating || 0),
+                safety_rating: parseFloat(spotResponse.data.safety_rating || 0),
+                latitude: parseFloat(spotResponse.data.latitude || 0),
+                longitude: parseFloat(spotResponse.data.longitude || 0),
+                // Fix the created_by safety_rating too
+                created_by: spotResponse.data.created_by ? {
+                    ...spotResponse.data.created_by,
+                    safety_rating: parseFloat(spotResponse.data.created_by.safety_rating || 0)
+                } : null,
             };
 
-            setSpot(mockSpotDetail);
+            setSpot(spotData);
+            console.log('✅ Loaded and converted spot data:', spotData);
         } catch (error) {
+            console.error('❌ Error fetching spot data:', error);
             Alert.alert('Error', 'Could not load spot details');
-            console.error('Spot fetch error:', error);
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const fetchReviews = async () => {
+        if (!spot) return;
+
+        try {
+            setIsLoadingReviews(true);
+            console.log('🔍 Fetching reviews for transport mode:', selectedTransportMode);
+
+            const filters: any = { limit: 20, sort_by: 'newest' };
+            if (selectedTransportMode !== 'all') {
+                filters.transport_mode = selectedTransportMode;
+            }
+
+            const response = await apiClient.getSpotReviews(id!, filters);
+            setReviews(response.data || []);
+
+            console.log('✅ Loaded reviews:', response.data);
+        } catch (error) {
+            console.error('❌ Error fetching reviews:', error);
+            // Don't show error alert for reviews - just log it
+        } finally {
+            setIsLoadingReviews(false);
+        }
+    };
+
+    const renderTransportModeSelector = () => {
+        if (!spot?.transport_modes?.length && !spot?.mode_ratings) return null;
+
+        // Get available modes from spot data
+        const availableModes = spot.transport_modes || Object.keys(spot.mode_ratings || {});
+        if (availableModes.length === 0) return null;
+
+        const modes = ['all', ...availableModes];
+
+        return (
+            <View style={styles.transportModeSelector}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {modes.map((mode) => (
+                        <TouchableOpacity
+                            key={mode}
+                            style={[
+                                styles.modeButton,
+                                {
+                                    backgroundColor: selectedTransportMode === mode
+                                        ? colors.primary
+                                        : colors.backgroundSecondary,
+                                    borderColor: colors.border
+                                }
+                            ]}
+                            onPress={() => setSelectedTransportMode(mode as TransportMode | 'all')}
+                        >
+                            <Text style={styles.modeButtonEmoji}>
+                                {mode === 'all' ? '🌍' : TRANSPORT_MODE_EMOJIS[mode as TransportMode]}
+                            </Text>
+                            <Text style={[
+                                styles.modeButtonText,
+                                {
+                                    color: selectedTransportMode === mode ? '#FFFFFF' : colors.text
+                                }
+                            ]}>
+                                {mode === 'all' ? 'All' : TRANSPORT_MODE_LABELS[mode as TransportMode]}
+                            </Text>
+                            {mode !== 'all' && spot.mode_ratings?.[mode] && (
+                                <Text style={[
+                                    styles.modeReviewCount,
+                                    {
+                                        color: selectedTransportMode === mode ? '#FFFFFF' : colors.textSecondary
+                                    }
+                                ]}>
+                                    ({spot.mode_ratings[mode].review_count})
+                                </Text>
+                            )}
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+            </View>
+        );
+    };
+
+    const renderModeSpecificRating = (review: Review) => {
+        const mode = review.transport_mode;
+
+        return (
+            <View style={styles.modeSpecificRatings}>
+                {mode === TransportMode.HITCHHIKING && review.wait_time_minutes && (
+                    <Text style={[styles.modeSpecificText, { color: colors.textSecondary }]}>
+                        ⏱️ Wait: {review.wait_time_minutes}min
+                    </Text>
+                )}
+                {mode === TransportMode.VAN_LIFE && review.legal_status && (
+                    <Text style={[styles.modeSpecificText, { color: colors.textSecondary }]}>
+                        ⚖️ Legal: {review.legal_status}/5
+                    </Text>
+                )}
+                {(mode === TransportMode.CYCLING || mode === TransportMode.WALKING) && review.facility_rating && (
+                    <Text style={[styles.modeSpecificText, { color: colors.textSecondary }]}>
+                        🏢 Facilities: {review.facility_rating}/5
+                    </Text>
+                )}
+                {review.accessibility_rating && (
+                    <Text style={[styles.modeSpecificText, { color: colors.textSecondary }]}>
+                        ♿ Access: {review.accessibility_rating}/5
+                    </Text>
+                )}
+            </View>
+        );
     };
 
     const handleNavigate = () => {
@@ -148,7 +271,7 @@ export default function SpotDetailScreen() {
 
         try {
             await Share.share({
-                message: `Check out this hitchhiking spot: ${spot.name}\n\n${spot.description}\n\nRating: ${spot.overall_rating}⭐ | Safety: ${spot.safety_rating}🛡️\n\nShared via Vendro`,
+                message: `Check out this spot: ${spot.name}\n\n${spot.description}\n\nRating: ${spot.overall_rating}⭐ | Safety: ${spot.safety_rating}🛡️\n\nShared via Vendro`,
                 title: spot.name,
             });
         } catch (error) {
@@ -170,7 +293,6 @@ export default function SpotDetailScreen() {
     };
 
     const submitReport = async (reason: string) => {
-        // TODO: Implement report functionality
         Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
     };
 
@@ -219,7 +341,7 @@ export default function SpotDetailScreen() {
                 <View style={styles.errorContainer}>
                     <Text style={[styles.errorText, { color: colors.textSecondary }]}>Spot not found</Text>
                     <TouchableOpacity
-                        style={[ { backgroundColor: colors.primary }]}
+                        style={[styles.backButtonContainer, { backgroundColor: colors.primary }]}
                         onPress={() => router.back()}
                     >
                         <Text style={styles.backButtonText}>← Go Back</Text>
@@ -247,7 +369,7 @@ export default function SpotDetailScreen() {
             </View>
 
             {/* Photos */}
-            {spot.photo_urls.length > 0 && (
+            {spot.photo_urls && spot.photo_urls.length > 0 && (
                 <Card style={styles.photosCard}>
                     <ScrollView
                         horizontal
@@ -290,25 +412,39 @@ export default function SpotDetailScreen() {
                     <Text style={[styles.spotType, { color: colors.textSecondary }]}>
                         {getSpotTypeDisplay(spot.spot_type)}
                     </Text>
+
+                    {/* Transport Modes */}
+                    {spot.transport_modes && spot.transport_modes.length > 0 && (
+                        <View style={styles.transportModes}>
+                            {spot.transport_modes.map((mode) => (
+                                <View key={mode} style={[styles.transportModeTag, { backgroundColor: colors.backgroundSecondary }]}>
+                                    <Text style={styles.transportModeEmoji}>{TRANSPORT_MODE_EMOJIS[mode]}</Text>
+                                    <Text style={[styles.transportModeText, { color: colors.text }]}>
+                                        {TRANSPORT_MODE_LABELS[mode]}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
+                    )}
                 </View>
 
                 <View style={styles.ratingsRow}>
                     <View style={styles.rating}>
                         <Text style={[styles.ratingLabel, { color: colors.textSecondary }]}>Overall</Text>
                         <Text style={[styles.ratingValue, { color: colors.primary }]}>
-                            ⭐ {spot.overall_rating.toFixed(1)}
+                            ⭐ {spot.overall_rating ? spot.overall_rating.toFixed(1) : '0.0'}
                         </Text>
                     </View>
                     <View style={styles.rating}>
                         <Text style={[styles.ratingLabel, { color: colors.textSecondary }]}>Safety</Text>
                         <Text style={[styles.ratingValue, { color: colors.success }]}>
-                            🛡️ {spot.safety_rating.toFixed(1)}
+                            🛡️ {spot.safety_rating ? spot.safety_rating.toFixed(1) : '0.0'}
                         </Text>
                     </View>
                     <View style={styles.rating}>
                         <Text style={[styles.ratingLabel, { color: colors.textSecondary }]}>Reviews</Text>
                         <Text style={[styles.ratingValue, { color: colors.textSecondary }]}>
-                            💬 {spot.reviews.length}
+                            💬 {spot.total_reviews || 0}
                         </Text>
                     </View>
                 </View>
@@ -335,7 +471,7 @@ export default function SpotDetailScreen() {
             </View>
 
             {/* Facilities */}
-            {spot.facilities.length > 0 && (
+            {spot.facilities && spot.facilities.length > 0 && (
                 <Card>
                     <Text style={[styles.sectionTitle, { color: colors.text }]}>🏢 Facilities</Text>
                     <View style={styles.facilitiesContainer}>
@@ -354,7 +490,7 @@ export default function SpotDetailScreen() {
             {/* Tips */}
             {spot.tips && (
                 <Card>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>💡 Hitchhiking Tips</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>💡 Tips</Text>
                     <Text style={[styles.tipsText, { color: colors.text }]}>{spot.tips}</Text>
                 </Card>
             )}
@@ -379,7 +515,8 @@ export default function SpotDetailScreen() {
                 <View style={styles.locationDetails}>
                     <Text style={[styles.locationLabel, { color: colors.textSecondary }]}>Added by:</Text>
                     <Text style={[styles.locationValue, { color: colors.text }]}>
-                        {spot.created_by.display_name} (⭐ {spot.created_by.safety_rating.toFixed(1)})
+                        {spot.created_by?.display_name || 'Unknown'}
+                        {spot.created_by?.safety_rating ? ` (⭐ ${parseFloat(spot.created_by.safety_rating.toString()).toFixed(1)})` : ''}
                     </Text>
                 </View>
                 <View style={styles.locationDetails}>
@@ -393,40 +530,61 @@ export default function SpotDetailScreen() {
             {/* Reviews Section */}
             <Card>
                 <View style={styles.reviewsHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>💬 Reviews ({spot.reviews.length})</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                        💬 Reviews ({spot.total_reviews || 0})
+                    </Text>
                     <TouchableOpacity
                         style={[styles.addReviewButton, { backgroundColor: colors.primary }]}
-                        onPress={() => Alert.alert('Add Review', 'Review feature coming soon!')}
+                        onPress={() => router.push({
+                            pathname: '/review/add',
+                            params: {
+                                spotId: spot.id,
+                                spotName: spot.name
+                            }
+                        })}
                     >
                         <Text style={styles.addReviewText}>+ Add Review</Text>
                     </TouchableOpacity>
                 </View>
 
-                {spot.reviews.length > 0 ? (
+                {/* Transport Mode Selector */}
+                {renderTransportModeSelector()}
+
+                {/* Reviews List */}
+                {isLoadingReviews ? (
+                    <LoadingSpinner message="Loading reviews..." size="small" />
+                ) : reviews.length > 0 ? (
                     <>
-                        {spot.reviews.slice(0, 3).map((review, index) => (
+                        {reviews.slice(0, 5).map((review, index) => (
                             <View key={review.id} style={[
                                 styles.reviewItem,
                                 { borderBottomColor: colors.border },
-                                index === spot.reviews.length - 1 && { borderBottomWidth: 0 }
+                                index === reviews.length - 1 && { borderBottomWidth: 0 }
                             ]}>
                                 <View style={styles.reviewHeader}>
-                                    <Text style={[styles.reviewUser, { color: colors.text }]}>
-                                        {review.user.display_name}
-                                    </Text>
+                                    <View style={styles.reviewUserInfo}>
+                                        <Text style={[styles.reviewUser, { color: colors.text }]}>
+                                            {TRANSPORT_MODE_EMOJIS[review.transport_mode]} {review.user.display_name}
+                                        </Text>
+                                        {review.location_verified && (
+                                            <Text style={[styles.verifiedLocation, { color: colors.success }]}>✓</Text>
+                                        )}
+                                    </View>
                                     <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
                                         {formatDate(review.created_at)}
                                     </Text>
                                 </View>
 
                                 <View style={styles.reviewRatings}>
-                                    <Text style={[styles.reviewRating, { color: colors.primary }]}>
-                                        Overall: ⭐ {review.overall_rating}
-                                    </Text>
                                     <Text style={[styles.reviewRating, { color: colors.success }]}>
                                         Safety: 🛡️ {review.safety_rating}
                                     </Text>
+                                    <Text style={[styles.reviewRating, { color: colors.primary }]}>
+                                        Effectiveness: ⚡ {review.effectiveness_rating}
+                                    </Text>
                                 </View>
+
+                                {renderModeSpecificRating(review)}
 
                                 {review.comment && (
                                     <Text style={[styles.reviewComment, { color: colors.text }]}>
@@ -436,20 +594,23 @@ export default function SpotDetailScreen() {
                             </View>
                         ))}
 
-                        {spot.reviews.length > 3 && (
+                        {reviews.length > 5 && (
                             <TouchableOpacity
                                 style={[styles.showMoreButton, { backgroundColor: colors.backgroundSecondary }]}
                                 onPress={() => Alert.alert('More Reviews', 'Full reviews screen coming soon!')}
                             >
                                 <Text style={[styles.showMoreText, { color: colors.primary }]}>
-                                    Show all {spot.reviews.length} reviews
+                                    Show all {reviews.length} reviews
                                 </Text>
                             </TouchableOpacity>
                         )}
                     </>
                 ) : (
                     <Text style={[styles.noReviews, { color: colors.textSecondary }]}>
-                        No reviews yet. Be the first to review this spot!
+                        {selectedTransportMode === 'all'
+                            ? 'No reviews yet. Be the first to review this spot!'
+                            : `No ${TRANSPORT_MODE_LABELS[selectedTransportMode as TransportMode]} reviews yet.`
+                        }
                     </Text>
                 )}
             </Card>
@@ -458,6 +619,79 @@ export default function SpotDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+    // ... keep all your existing styles and add these new ones:
+
+    transportModes: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 8,
+    },
+    transportModeTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    transportModeEmoji: {
+        fontSize: 12,
+        marginRight: 4,
+    },
+    transportModeText: {
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    transportModeSelector: {
+        marginBottom: 16,
+    },
+    modeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 20,
+        marginRight: 8,
+        borderWidth: 1,
+    },
+    modeButtonEmoji: {
+        fontSize: 14,
+        marginRight: 4,
+    },
+    modeButtonText: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginRight: 4,
+    },
+    modeReviewCount: {
+        fontSize: 10,
+    },
+    modeSpecificRatings: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginVertical: 4,
+    },
+    modeSpecificText: {
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    reviewUserInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    verifiedLocation: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    backButtonContainer: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 8,
+    },
+
+    // ... keep all your other existing styles from the original file
     header: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -694,8 +928,8 @@ const styles = StyleSheet.create({
         fontSize: 18,
         marginBottom: Layout.spacing.lg,
     },
-
     backButtonText: {
-        fontWeight: "600"
+        fontWeight: "600",
+        color: '#FFFFFF',
     }
 });

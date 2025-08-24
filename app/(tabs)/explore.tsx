@@ -28,6 +28,8 @@ export default function MapScreen() {
     useEffect(() => {
         fetchSpots();
     }, []);
+
+
     const fetchSpots = async () => {
         try {
             console.log('🔍 Fetching spots from API...');

@@ -3,7 +3,7 @@ import { Platform } from 'react-native';
 const getApiBaseUrl = () => {
     if (__DEV__) {
         // Replace with YOUR computer's IP address
-        const YOUR_COMPUTER_IP = '192.168.0.45'; // Your current IP
+        const YOUR_COMPUTER_IP = ''; // Your current IP
         return `http://${YOUR_COMPUTER_IP}:3000/api/v1`;
     }
     return 'https://your-production-url.com/api/v1';
@@ -140,6 +140,27 @@ class ApiClient {
         return this.request<any[]>(`/spots?${params}`);
     }
 
+    async getSpotReviews(spotId: string, filters: {
+        transport_mode?: string;
+        limit?: number;
+        offset?: number;
+        sort_by?: 'newest' | 'oldest' | 'most_helpful';
+    } = {}) {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value !== undefined) params.append(key, value.toString());
+        });
+
+        return this.request<any[]>(`/spots/${spotId}/reviews?${params}`);
+    }
+
+    async getSpotReviewSummary(spotId: string) {
+        return this.request<any>(`/spots/${spotId}/reviews/summary`);
+    }
+
+
+
+
     async getNearbySpots(latitude: number, longitude: number, radius = 10, limit = 20) {
         return this.request<any[]>(
             `/spots/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&limit=${limit}`
@@ -166,18 +187,39 @@ class ApiClient {
         });
     }
 
-    async updateSpot(id: string, spotData: any) {
+    async updateSpot(id: string, spotData: {
+        name?: string;
+        description?: string;
+        tips?: string;
+        accessibility_info?: string;
+        facilities?: string[];
+    }) {
         return this.request<any>(`/spots/${id}`, {
             method: 'PUT',
             body: JSON.stringify(spotData),
         });
     }
 
+    async deleteSpot(id: string) {
+        return this.request<any>(`/spots/${id}`, {
+            method: 'DELETE',
+        });
+    }
+
     async addSpotReview(spotId: string, reviewData: {
+        transport_mode: string;
         safety_rating: number;
+        effectiveness_rating: number;
         overall_rating: number;
         comment?: string;
+        wait_time_minutes?: number;
+        legal_status?: number;
+        facility_rating?: number;
+        accessibility_rating?: number;
+        review_latitude?: number;
+        review_longitude?: number;
         photos?: string[];
+        context?: string;
     }) {
         return this.request<any>(`/spots/${spotId}/reviews`, {
             method: 'POST',
