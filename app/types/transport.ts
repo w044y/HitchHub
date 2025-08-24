@@ -1,4 +1,4 @@
-// app/types/transport.ts - Create this new file
+// app/types/transport.ts - Create this file (move enums here)
 export enum TransportMode {
     HITCHHIKING = 'hitchhiking',
     CYCLING = 'cycling',
@@ -20,35 +20,22 @@ export const TRANSPORT_MODE_EMOJIS = {
     [TransportMode.WALKING]: '🚶'
 };
 
-export interface Review {
+export interface HitchhikingSpot {
     id: string;
-    transport_mode: TransportMode;
-    safety_rating: number;
-    effectiveness_rating: number;
-    overall_rating: number;
-    comment?: string;
-    wait_time_minutes?: number;
-    legal_status?: number;
-    facility_rating?: number;
-    accessibility_rating?: number;
-    location_verified: boolean;
-    distance_from_spot?: number;
-    context?: any;
-    created_at: string;
-    user: {
-        id: string;
-        display_name: string;
-        username: string;
-        safety_rating: number;
+    name: string;
+    type: 'rest_stop' | 'gas_station' | 'bridge' | 'highway_entrance' | 'town_center' | 'other';
+    coordinates: {
+        latitude: number;
+        longitude: number;
     };
-}
-
-export interface ReviewSummary {
-    total_reviews: number;
-    overall_safety_rating: number;
-    overall_rating: number;
-    last_reviewed: string | null;
-    mode_ratings: {
+    rating: number;
+    safetyRating: 'high' | 'medium' | 'low';
+    description: string;
+    addedBy: string;
+    lastUpdated: string;
+    verified: boolean;
+    transportModes?: TransportMode[];
+    modeRatings?: {
         [key: string]: {
             safety: number;
             effectiveness: number;
@@ -59,5 +46,5 @@ export interface ReviewSummary {
             accessibility?: number;
         };
     };
-    transport_modes_available: TransportMode[];
+    totalReviews?: number;
 }

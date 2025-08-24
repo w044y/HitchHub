@@ -1,26 +1,13 @@
-// components/map/MapView.tsx
+// components/map/MapView.tsx - Remove duplicate interface
 import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import MapView, { Marker, Region, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { SpotMarker } from '../spots/SpotMarker';
+import { TransportMode, HitchhikingSpot } from '@/app/types/transport'; // Import from shared types
 
-export interface HitchhikingSpot {
-    id: string;
-    name: string;
-    type: 'rest_stop' | 'gas_station' | 'bridge' | 'highway_entrance' | 'town_center' | 'other';
-    coordinates: {
-        latitude: number;
-        longitude: number;
-    };
-    rating: number;
-    safetyRating: 'high' | 'medium' | 'low';
-    description: string;
-    addedBy: string;
-    lastUpdated: string;
-    verified: boolean;
-}
+// Remove the duplicate HitchhikingSpot interface - it's now in transport.ts
 
 export interface MapViewHandle {
     animateToRegion: (region: Region) => void;
@@ -54,7 +41,7 @@ export const HitchhikingMapView = forwardRef<MapViewHandle, HitchhikingMapViewPr
         const [loading, setLoading] = useState(true);
         const [region, setRegion] = useState<Region>(
             initialRegion || {
-                latitude: 52.5200, // Berlin default
+                latitude: 52.5200,
                 longitude: 13.4050,
                 latitudeDelta: 0.0922,
                 longitudeDelta: 0.0421,
@@ -63,7 +50,6 @@ export const HitchhikingMapView = forwardRef<MapViewHandle, HitchhikingMapViewPr
 
         const mapRef = useRef<MapView>(null);
 
-        // Expose methods to parent components
         useImperativeHandle(ref, () => ({
             animateToRegion: (newRegion: Region) => {
                 mapRef.current?.animateToRegion(newRegion, 1000);
@@ -121,11 +107,11 @@ export const HitchhikingMapView = forwardRef<MapViewHandle, HitchhikingMapViewPr
         };
 
         const handleMapPress = (event: MapPressEvent) => {
-            console.log('🗺️ Map pressed!', event.nativeEvent); // Add this for debugging
+            console.log('🗺️ Map pressed!', event.nativeEvent);
 
             if (onMapPress) {
                 const { coordinate } = event.nativeEvent;
-                console.log('📍 Coordinate:', coordinate); // Add this for debugging
+                console.log('📍 Coordinate:', coordinate);
                 onMapPress(coordinate);
             }
         };
@@ -174,6 +160,10 @@ export const HitchhikingMapView = forwardRef<MapViewHandle, HitchhikingMapViewPr
         );
     }
 );
+
+// Export types for other components
+export type { HitchhikingSpot };
+export { TransportMode };
 
 const styles = StyleSheet.create({
     container: {
