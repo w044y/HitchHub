@@ -1,18 +1,19 @@
 // app/(tabs)/explore.tsx - Add transport mode filtering
-import React, { useState, useRef, useEffect } from 'react';
-import {View, StyleSheet, TextInput, Alert, Platform, TouchableOpacity} from 'react-native';
-import { Text } from '../../components/Themed';
-import { Screen } from '../../components/layout/Screen';
-import { HitchhikingMapView, MapViewHandle, HitchhikingSpot } from '../../components/map/MapView';
-import { MapControls } from '../../components/map/MapControls';
-import { Region } from 'react-native-maps';
-import { Colors } from '../../constants/Colors';
-import { useColorScheme } from '../../components/useColorScheme';
-import { router } from 'expo-router';
-import { apiClient } from "@/app/services/api";
+import React, {useEffect, useRef, useState} from 'react';
+import {Alert, StyleSheet, TextInput, TouchableOpacity, View} from 'react-native';
+import {Text} from '../../components/Themed';
+import {Screen} from '../../components/layout/Screen';
+import {HitchhikingMapView, HitchhikingSpot, MapViewHandle} from '../../components/map/MapView';
+import {MapControls} from '../../components/map/MapControls';
+import {Region} from 'react-native-maps';
+import {Colors} from '../../constants/Colors';
+import {useColorScheme} from '../../components/useColorScheme';
+import {router} from 'expo-router';
+import {apiClient} from "@/app/services/api";
 import {TRANSPORT_MODE_EMOJIS, TRANSPORT_MODE_LABELS, TransportMode} from "@/app/types/transport";
 import {Typography} from "@/constants/Typography";
 import {Layout} from "@/constants/Layout";
+import {getModeSpecificData} from "@/app/utils/modeAdaptations";
 
 export default function MapScreen() {
     const [spots, setSpots] = useState<HitchhikingSpot[]>([]);
@@ -218,33 +219,49 @@ export default function MapScreen() {
 
     // Update existing handlers
     const handleSpotPress = (spot: HitchhikingSpot) => {
-        setSelectedSpot(spot);
-
-        // Show transport modes in the alert
-        const transportInfo = spot.transportModes && spot.transportModes.length > 0
-            ? `🚀 Modes: ${spot.transportModes.map(mode => TRANSPORT_MODE_EMOJIS[mode]).join(' ')}`
-            : '';
+        const modeData = getModeSpecificData(spot, activeTransportModes.has(TransportMode.ALL) ? TransportMode.HITCHHIKING : Array.from(activeTransportModes)[0]);
 
         Alert.alert(
             `${spot.name} ${spot.verified ? '✓' : ''}`,
-            `${spot.description}\n\n⭐ Rating: ${spot.rating}/5\n🛡️ Safety: ${spot.safetyRating}\n📍 Type: ${spot.type.replace('_', ' ')}\n${transportInfo}\n👤 Added by: ${spot.addedBy}\n🕒 Updated: ${spot.lastUpdated}`,
+            `${spot.description}\n\n📊 ${modeData.primaryMetric}\n💡 ${modeData.contextualTip}\n\n⭐ Rating: ${spot.rating}/5\n🛡️ Safety: ${spot.safetyRating}\n👤 Added by: ${spot.addedBy}`,
             [
                 {
-                    text: 'Navigate',
-                    onPress: () => handleNavigateToSpot(spot)
+                    text: modeData.quickAction,
+                    onPress: () => handleQuickAction(modeData.quickAction, spot)
                 },
                 {
-                    text: 'Details',
+                    text: 'Full Details',
                     onPress: () => router.push({
                         pathname: '/spots/[id]',
                         params: { id: spot.id }
-                    })// Fix 1: Use query parameter approach
+                    })
                 },
                 { text: 'Close', style: 'cancel' }
             ]
         );
     };
 
+    const handleQuickAction = (action: string, spot: HitchhikingSpot) => {
+        switch (action) {
+            case 'Quick Review':
+                router.push({
+                    pathname: '/review/add',
+                    params: { spotId: spot.id, spotName: spot.name }
+                });
+                break;
+            case 'Safety Check':
+                Alert.alert('Safety Info', `This spot has a ${spot.safetyRating} safety rating. Check recent reviews for current conditions.`);
+                break;
+            case 'Route Profile':
+                Alert.alert('Route Profile', 'Elevation and cycling route analysis coming soon!');
+                break;
+            case 'Legal Status':
+                Alert.alert('Legal Status', 'Parking and overnight legality information coming soon!');
+                break;
+            default:
+                handleNavigateToSpot(spot);
+        }
+    };
     const handleMapPress = (coordinate: { latitude: number; longitude: number }) => {
         console.log('🗺️ Map tapped at:', coordinate);
 

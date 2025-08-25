@@ -3,21 +3,24 @@ export enum TransportMode {
     HITCHHIKING = 'hitchhiking',
     CYCLING = 'cycling',
     VAN_LIFE = 'van_life',
-    WALKING = 'walking'
+    WALKING = 'walking',
+    ALL = 'all',
 }
 
 export const TRANSPORT_MODE_LABELS = {
     [TransportMode.HITCHHIKING]: 'Hitchhiking',
     [TransportMode.CYCLING]: 'Cycling',
     [TransportMode.VAN_LIFE]: 'Van Life',
-    [TransportMode.WALKING]: 'Walking'
+    [TransportMode.WALKING]: 'Walking',
+    [TransportMode.ALL]: 'all',
 };
 
 export const TRANSPORT_MODE_EMOJIS = {
     [TransportMode.HITCHHIKING]: '👍',
     [TransportMode.CYCLING]: '🚲',
     [TransportMode.VAN_LIFE]: '🚐',
-    [TransportMode.WALKING]: '🚶'
+    [TransportMode.WALKING]: '🚶',
+    [TransportMode.ALL]: "🚶🚶"
 };
 
 export interface HitchhikingSpot {
