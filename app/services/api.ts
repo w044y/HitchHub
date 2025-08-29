@@ -1,4 +1,7 @@
 import { Platform } from 'react-native';
+import {TransportMode} from "@/app/types/transport";
+import {TravelProfile} from "@/app/types/profile";
+import {apiCache} from "@/app/services/api-cache";
 
 const getApiBaseUrl = () => {
     if (__DEV__) {
@@ -24,6 +27,7 @@ interface ApiResponse<T> {
 class ApiClient {
     private baseURL: string;
     private token: string | null = null;
+    private pendingRequests = new Map<string, Promise<any>>();
 
     constructor(baseURL: string) {
         this.baseURL = baseURL;
@@ -31,13 +35,44 @@ class ApiClient {
 
     setToken(token: string | null) {
         this.token = token;
+        console.log('🔑 API Token', token ? 'set' : 'cleared');
+
     }
 
     private async request<T>(
         endpoint: string,
-        options: RequestInit = {}
+        options: RequestInit = {},
+        cacheConfig?: {
+            useCache?: boolean;
+            ttl?: number;
+            cacheKey?: string;
+        }
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
+        const method = options.method || 'GET';
+
+        // Generate cache key
+        const defaultCacheKey = apiCache.generateCacheKey(endpoint, {
+            method,
+            body: options.body,
+            headers: options.headers,
+        });
+        const cacheKey = cacheConfig?.cacheKey || defaultCacheKey;
+
+        // For GET requests, check cache first
+        if (method === 'GET' && cacheConfig?.useCache !== false) {
+            const cached = apiCache.get<ApiResponse<T>>(cacheKey, cacheConfig?.ttl);
+            if (cached) {
+                console.log(`💾 Cache HIT: ${endpoint}`);
+                return cached;
+            }
+
+            // Check if request is already in flight
+            if (this.pendingRequests.has(cacheKey)) {
+                console.log(`⏳ Request already pending: ${endpoint}`);
+                return this.pendingRequests.get(cacheKey);
+            }
+        }
 
         const config: RequestInit = {
             ...options,
@@ -48,24 +83,26 @@ class ApiClient {
             },
         };
 
+        const requestPromise = this.executeRequest<T>(url, config, endpoint);
+
+        // Store pending request to prevent duplicates
+        if (method === 'GET') {
+            this.pendingRequests.set(cacheKey, requestPromise);
+        }
+
         try {
-            console.log(`🌐 API ${config.method || 'GET'}: ${url}`);
+            const response = await requestPromise;
 
-            const response = await fetch(url, config);
-            const data = await response.json();
-
-            console.log('📊 Response status:', response.status);
-            console.log('📊 Response data:', JSON.stringify(data, null, 2));
-
-            if (!response.ok) {
-                throw new Error(data.error?.message || `HTTP ${response.status}`);
+            // Cache successful GET responses
+            if (method === 'GET' && cacheConfig?.useCache !== false) {
+                apiCache.set(cacheKey, response, cacheConfig?.ttl);
+                console.log(`💾 Cache SET: ${endpoint}`);
             }
 
-            console.log(`✅ API Success: ${endpoint}`);
-            return data;
-        } catch (error) {
-            console.error(`❌ API Error: ${endpoint}`, error);
-            throw error;
+            return response;
+        } finally {
+            // Clean up pending request
+            this.pendingRequests.delete(cacheKey);
         }
     }
 
@@ -124,7 +161,26 @@ class ApiClient {
         return this.request<any>(`/users/${id}/stats`);
     }
 
-    // Spots Methods
+    private async executeRequest<T>(url: string, config: RequestInit, endpoint: string): Promise<ApiResponse<T>> {
+        try {
+            console.log(`🌐 API ${config.method || 'GET'}: ${url}`);
+
+            const response = await fetch(url, config);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error?.message || `HTTP ${response.status}`);
+            }
+
+            console.log(`✅ API Success: ${endpoint}`);
+            return data;
+        } catch (error) {
+            console.error(`❌ API Error: ${endpoint}`, error);
+            throw error;
+        }
+    }
+
+
     async getSpots(filters: {
         limit?: number;
         offset?: number;
@@ -132,12 +188,64 @@ class ApiClient {
         is_verified?: boolean;
         min_rating?: number;
     } = {}) {
-        const params = new URLSearchParams();
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined) params.append(key, value.toString());
-        });
+        const cacheKey = `spots:basic:${JSON.stringify(filters)}`;
 
-        return this.request<any[]>(`/spots?${params}`);
+        return this.request<any[]>('/spots', {
+            method: 'GET',
+        }, {
+            useCache: true,
+            ttl: 10 * 60 * 1000, // 10 minutes for basic spots
+            cacheKey
+        });
+    }
+
+    async getSpotsFiltered(filters: {
+        transportModes?: string[];
+        latitude?: number;
+        longitude?: number;
+        radius?: number;
+        limit?: number;
+        offset?: number;
+        spotType?: string;
+        minRating?: number;
+        safetyPriority?: string;
+    } = {}) {
+        // Create stable cache key
+        const locationKey = filters.latitude && filters.longitude
+            ? `${filters.latitude.toFixed(3)},${filters.longitude.toFixed(3)},${filters.radius || 10}`
+            : 'no-location';
+
+        const cacheKey = `spots:filtered:${JSON.stringify({
+            modes: filters.transportModes?.sort(),
+            location: locationKey,
+            spotType: filters.spotType,
+            minRating: filters.minRating,
+            safety: filters.safetyPriority,
+            limit: filters.limit || 50,
+            offset: filters.offset || 0
+        })}`;
+
+        const params = new URLSearchParams();
+
+        if (filters.transportModes?.length) {
+            params.append('transport_modes', filters.transportModes.join(','));
+        }
+        if (filters.latitude) params.append('latitude', filters.latitude.toString());
+        if (filters.longitude) params.append('longitude', filters.longitude.toString());
+        if (filters.radius) params.append('radius', filters.radius.toString());
+        if (filters.limit) params.append('limit', filters.limit.toString());
+        if (filters.offset) params.append('offset', filters.offset.toString());
+        if (filters.spotType) params.append('spot_type', filters.spotType);
+        if (filters.minRating) params.append('min_rating', filters.minRating.toString());
+        if (filters.safetyPriority) params.append('safety_priority', filters.safetyPriority);
+
+        return this.request<any[]>(`/spots/filtered?${params}`, {
+            method: 'GET',
+        }, {
+            useCache: true,
+            ttl: filters.latitude ? 2 * 60 * 1000 : 5 * 60 * 1000,
+            cacheKey
+        });
     }
 
     async getSpotReviews(spotId: string, filters: {
@@ -280,6 +388,24 @@ class ApiClient {
             body: JSON.stringify({ spot_id: spotId, order_index: orderIndex }),
         });
     }
-}
+    async getUserProfile(userId: string) {
+        return this.request<any>(`/users/${userId}/profile`);
+    }
+
+    async updateUserProfile(userId: string, profileData: any) {
+        return this.request<any>(`/users/${userId}/profile`, {
+            method: 'PUT',
+            body: JSON.stringify(profileData),
+        });
+    }
+
+
+    async createUserProfile(userId: string, profileData: any) {
+        return this.request<any>(`/users/${userId}/profile`, {
+            method: 'POST',
+            body: JSON.stringify(profileData),
+        });
+    }}
+
 
 export const apiClient = new ApiClient(API_BASE_URL);

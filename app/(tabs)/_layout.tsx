@@ -104,13 +104,7 @@ export default function TabLayout() {
             />
 
             {/* Hidden add spot screen */}
-            <Tabs.Screen
-                name="add-spot"
-                options={{
-                    title: 'Add Spot',
-                    href: null, // Hide from tab bar
-                }}
-            />
+
         </Tabs>
     );
 }

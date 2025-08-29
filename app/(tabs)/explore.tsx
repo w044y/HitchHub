@@ -1,49 +1,175 @@
-// app/(tabs)/explore.tsx - Add transport mode filtering
-import React, {useEffect, useRef, useState} from 'react';
-import {Alert, StyleSheet, TextInput, TouchableOpacity, View} from 'react-native';
-import {Text} from '../../components/Themed';
-import {Screen} from '../../components/layout/Screen';
-import {HitchhikingMapView, HitchhikingSpot, MapViewHandle} from '../../components/map/MapView';
-import {MapControls} from '../../components/map/MapControls';
-import {Region} from 'react-native-maps';
-import {Colors} from '../../constants/Colors';
-import {useColorScheme} from '../../components/useColorScheme';
-import {router} from 'expo-router';
-import {apiClient} from "@/app/services/api";
-import {TRANSPORT_MODE_EMOJIS, TRANSPORT_MODE_LABELS, TransportMode} from "@/app/types/transport";
-import {Typography} from "@/constants/Typography";
-import {Layout} from "@/constants/Layout";
-import {getModeSpecificData} from "@/app/utils/modeAdaptations";
+// app/(tabs)/explore.tsx - FIXED VERSION
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import { Alert, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Text } from '../../components/Themed';
+import { Screen } from '../../components/layout/Screen';
+import { HitchhikingMapView, HitchhikingSpot, MapViewHandle } from '../../components/map/MapView';
+import { MapControls } from '../../components/map/MapControls';
+import { Region } from 'react-native-maps';
+import { Colors } from '../../constants/Colors';
+import { useColorScheme } from '../../components/useColorScheme';
+import { router } from 'expo-router';
+import { apiClient } from "@/app/services/api";
+import { TRANSPORT_MODE_EMOJIS, TRANSPORT_MODE_LABELS, TransportMode } from "@/app/types/transport";
+import { Typography } from "@/constants/Typography";
+import { Layout } from "@/constants/Layout";
+import { useProfile } from "@/app/contexts/ProfileContext";
+import * as Location from 'expo-location';
 
 export default function MapScreen() {
     const [spots, setSpots] = useState<HitchhikingSpot[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSpot, setSelectedSpot] = useState<HitchhikingSpot | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
-    // NEW: Transport mode filtering state
-    const [activeTransportModes, setActiveTransportModes] = useState<Set<TransportMode>>(
-        new Set(Object.values(TransportMode)) // Start with all modes active
-    );
+    const { profile } = useProfile();
+    const [currentFilterMode, setCurrentFilterMode] = useState<'personal' | 'all' | 'custom'>('personal');
+    const [customTransportModes, setCustomTransportModes] = useState<Set<TransportMode>>(new Set());
     const [showFilterPanel, setShowFilterPanel] = useState(false);
+    const loadingSpotsRef = useRef(false);
+    const lastLoadParamsRef = useRef<string>('');
 
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const mapRef = useRef<MapViewHandle>(null);
 
+    // Debounce utility function
+    function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
+        let timeoutId: number;
+        return ((...args: any[]) => {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => func.apply(null, args), delay);
+        }) as T;
+    }
+
+    const loadSpotsDebounced = useCallback(
+        debounce(() => {
+            if (!loadingSpotsRef.current) {
+                loadSpots();
+            }
+        }, 300),
+        [currentFilterMode, customTransportModes, userLocation, profile]
+    );
+
     useEffect(() => {
-        const loadSpots = async () => {
-            await fetchSpots();
-        };
-        loadSpots();
+        getUserLocation();
     }, []);
 
-    const fetchSpots = async () => {
-        try {
-            console.log('🔍 Fetching spots from API...');
-            const response = await apiClient.getSpots({ limit: 100 });
+    useEffect(() => {
+        if (profile) {
+            // FIXED: Use selectedModes instead of travelModes
+            setCustomTransportModes(new Set(profile.selectedModes));
 
-            // Convert API response with transport mode info
+            const currentParams = JSON.stringify({
+                filterMode: currentFilterMode,
+                customModes: Array.from(customTransportModes).sort(),
+                hasLocation: !!userLocation,
+                profileModes: profile.selectedModes.sort() // FIXED: selectedModes
+            });
+
+            if (currentParams !== lastLoadParamsRef.current) {
+                lastLoadParamsRef.current = currentParams;
+                console.log('🔄 Parameters changed, loading spots...');
+                loadSpotsDebounced();
+            } else {
+                console.log('⏭️ Parameters unchanged, skipping API call');
+            }
+        }
+    }, [profile, currentFilterMode, customTransportModes, userLocation, loadSpotsDebounced]);
+
+    const getUserLocation = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                console.warn('Location permission denied');
+                if (profile) loadSpotsDebounced();
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+
+            const newLocation = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+            };
+
+            if (!userLocation ||
+                Math.abs(userLocation.latitude - newLocation.latitude) > 0.001 ||
+                Math.abs(userLocation.longitude - newLocation.longitude) > 0.001
+            ) {
+                setUserLocation(newLocation);
+                console.log('✅ Location updated:', newLocation);
+            }
+        } catch (error) {
+            console.error('❌ Error getting location:', error);
+            if (profile) loadSpotsDebounced();
+        }
+    };
+
+    const loadSpots = async () => {
+        if (loadingSpotsRef.current) {
+            console.log('⏭️ Already loading spots, skipping...');
+            return;
+        }
+
+        try {
+            loadingSpotsRef.current = true;
+            setIsLoading(true);
+            console.log('🔍 Loading spots with smart filtering...');
+
+            let response;
+
+            switch (currentFilterMode) {
+                case 'personal':
+                    // FIXED: Use profile.selectedModes and basic getSpots with filters
+                    const personalModes = profile?.selectedModes || [TransportMode.HITCHHIKING];
+                    console.log('👤 Loading personal spots for modes:', personalModes);
+
+                    response = await apiClient.getSpots({
+                        limit: 100,
+                        ...(userLocation && {
+                            // For now, just get all spots and filter client-side
+                            // TODO: Implement transport mode filtering in backend
+                        })
+                    });
+
+                    // Client-side filtering for now
+                    response.data = response.data.filter((apiSpot: any) => {
+                        const spotModes = apiSpot.transport_modes || [TransportMode.HITCHHIKING];
+                        return personalModes.some(mode => spotModes.includes(mode));
+                    });
+                    break;
+
+                case 'custom':
+                    if (customTransportModes.size === 0) {
+                        console.log('⚠️ No custom transport modes selected');
+                        setSpots([]);
+                        setIsLoading(false);
+                        return;
+                    }
+
+                    console.log('🎛️ Loading custom spots for modes:', Array.from(customTransportModes));
+
+                    response = await apiClient.getSpots({ limit: 100 });
+
+                    // Client-side filtering
+                    response.data = response.data.filter((apiSpot: any) => {
+                        const spotModes = apiSpot.transport_modes || [TransportMode.HITCHHIKING];
+                        return Array.from(customTransportModes).some(mode => spotModes.includes(mode));
+                    });
+                    break;
+
+                case 'all':
+                default:
+                    console.log('🌍 Loading all spots');
+                    response = await apiClient.getSpots({ limit: 100 });
+                    break;
+            }
+
+            // Convert API response
             const convertedSpots: HitchhikingSpot[] = response.data.map((apiSpot: any) => {
                 const safetyRating = parseFloat(apiSpot.safety_rating || 0);
                 const overallRating = parseFloat(apiSpot.overall_rating || 0);
@@ -62,172 +188,220 @@ export default function MapScreen() {
                     addedBy: apiSpot.created_by?.display_name || 'Unknown',
                     lastUpdated: new Date(apiSpot.created_at).toLocaleDateString(),
                     verified: apiSpot.is_verified || false,
-                    // NEW: Add transport modes to the spot data
-                    transportModes: apiSpot.transport_modes || [TransportMode.HITCHHIKING], // Default to hitchhiking if none specified
+                    transportModes: apiSpot.transport_modes || [TransportMode.HITCHHIKING],
                     modeRatings: apiSpot.mode_ratings || {},
                     totalReviews: apiSpot.total_reviews || 0,
                 };
             });
 
             setSpots(convertedSpots);
-            console.log(`✅ Successfully loaded ${convertedSpots.length} spots`);
-        } catch (error) {
-            console.error('❌ Error fetching spots:', error);
-            Alert.alert('Error', 'Could not load spots from server');
 
-            // Fallback with mock data that includes transport modes
-            setSpots([
-                {
-                    id: 'fallback-1',
-                    name: 'Fallback Test Spot',
-                    type: 'rest_stop',
-                    coordinates: { latitude: 52.5200, longitude: 13.4050 },
-                    rating: 4.0,
-                    safetyRating: 'high',
-                    description: 'Fallback data - API connection failed',
-                    addedBy: 'System',
-                    lastUpdated: 'Now',
-                    verified: false,
-                    transportModes: [TransportMode.HITCHHIKING, TransportMode.CYCLING],
-                    modeRatings: {},
-                    totalReviews: 0,
-                }
-            ]);
+            const filterDescription =
+                currentFilterMode === 'personal' ? `your ${profile?.selectedModes.map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')} preferences` :
+                    currentFilterMode === 'custom' ? `${Array.from(customTransportModes).map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')} modes` :
+                        'all transport modes';
+
+            console.log(`✅ Loaded ${convertedSpots.length} spots filtered for ${filterDescription}`);
+
+        } catch (error) {
+            console.error('❌ Error loading spots:', error);
+            Alert.alert('Error', 'Could not load spots from server');
         } finally {
             setIsLoading(false);
+            loadingSpotsRef.current = false;
         }
     };
 
-    // NEW: Toggle transport mode filter
-    const toggleTransportMode = (mode: TransportMode) => {
-        setActiveTransportModes(prev => {
+    const handleFilterModeChange = (newMode: 'personal' | 'all' | 'custom') => {
+        if (newMode === currentFilterMode) return;
+
+        console.log(`🎛️ Filter mode changed: ${currentFilterMode} → ${newMode}`);
+        setCurrentFilterMode(newMode);
+        setShowFilterPanel(false);
+    };
+
+    const toggleCustomTransportMode = (mode: TransportMode) => {
+        setCustomTransportModes(prev => {
             const newModes = new Set(prev);
             if (newModes.has(mode)) {
                 newModes.delete(mode);
             } else {
                 newModes.add(mode);
             }
+            console.log(`🎯 Custom modes updated:`, Array.from(newModes));
             return newModes;
         });
     };
 
-    // NEW: Clear all filters
-    const clearAllFilters = () => {
-        setActiveTransportModes(new Set(Object.values(TransportMode)));
-    };
-
-    // NEW: Filter spots based on active transport modes and search
-    const getFilteredSpots = () => {
-        let filtered = spots;
-
-        // Filter by transport modes
-        if (activeTransportModes.size < Object.values(TransportMode).length) {
-            filtered = filtered.filter(spot =>
-                spot.transportModes?.some(mode => activeTransportModes.has(mode)) ||
-                (spot.transportModes?.length === 0 && activeTransportModes.has(TransportMode.HITCHHIKING)) // Default for spots without transport modes
-            );
-        }
-
-        // Filter by search query
-        if (searchQuery) {
-            filtered = filtered.filter(spot =>
-                spot.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                spot.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                spot.description.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        return filtered;
-    };
-
-    const filteredSpots = getFilteredSpots();
-
-    // NEW: Get stats for filtered spots
     const getFilterStats = () => {
         const stats = {
-            total: filteredSpots.length,
-            highSafety: filteredSpots.filter(s => s.safetyRating === 'high').length,
-            verified: filteredSpots.filter(s => s.verified).length,
+            total: spots.length,
+            highSafety: spots.filter(s => s.safetyRating === 'high').length,
+            verified: spots.filter(s => s.verified).length,
             byMode: {} as Record<TransportMode, number>
         };
 
-        // Count spots by transport mode
         Object.values(TransportMode).forEach(mode => {
-            stats.byMode[mode] = filteredSpots.filter(spot =>
-                spot.transportModes?.includes(mode) ||
-                (spot.transportModes?.length === 0 && mode === TransportMode.HITCHHIKING)
+            stats.byMode[mode] = spots.filter(spot =>
+                spot.transportModes?.includes(mode)
             ).length;
         });
 
         return stats;
     };
 
-    const stats = getFilterStats();
-
-    // NEW: Render transport mode filter panel
-    const renderTransportModeFilters = () => {
+    const renderFilterPanel = () => {
         if (!showFilterPanel) return null;
 
         return (
             <View style={[styles.filterPanel, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <View style={styles.filterHeader}>
-                    <Text style={[styles.filterTitle, { color: colors.text }]}>Filter by Transport Mode</Text>
-                    <TouchableOpacity onPress={clearAllFilters}>
-                        <Text style={[styles.clearButton, { color: colors.primary }]}>Show All</Text>
+                    <Text style={[styles.filterTitle, { color: colors.text }]}>🎯 Smart Filtering</Text>
+                    <TouchableOpacity onPress={() => setShowFilterPanel(false)}>
+                        <Text style={[styles.closeButton, { color: colors.textSecondary }]}>✕</Text>
                     </TouchableOpacity>
                 </View>
 
-                <View style={styles.transportModeFilters}>
-                    {Object.values(TransportMode).map((mode) => {
-                        const isActive = activeTransportModes.has(mode);
-                        const count = stats.byMode[mode];
+                {/* Filter Mode Selection */}
+                <View style={styles.filterModeSection}>
+                    <TouchableOpacity
+                        style={[
+                            styles.filterModeButton,
+                            currentFilterMode === 'personal' && { backgroundColor: colors.primary },
+                            { borderColor: colors.border }
+                        ]}
+                        onPress={() => handleFilterModeChange('personal')}
+                    >
+                        <Text style={[
+                            styles.filterModeText,
+                            { color: currentFilterMode === 'personal' ? '#FFFFFF' : colors.text }
+                        ]}>
+                            🎒 My Travel Style
+                        </Text>
+                        {profile && (
+                            <Text style={[
+                                styles.filterModeSubtext,
+                                { color: currentFilterMode === 'personal' ? '#FFFFFF' : colors.textSecondary }
+                            ]}>
+                                {profile.selectedModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join(' ')} {profile.selectedModes.map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')}
+                            </Text>
+                        )}
+                    </TouchableOpacity>
 
-                        return (
-                            <TouchableOpacity
-                                key={mode}
-                                style={[
-                                    styles.transportModeFilter,
-                                    {
-                                        backgroundColor: isActive ? colors.primary : colors.backgroundSecondary,
-                                        borderColor: isActive ? colors.primary : colors.border,
-                                    }
-                                ]}
-                                onPress={() => toggleTransportMode(mode)}
-                            >
-                                <Text style={styles.filterModeEmoji}>
-                                    {TRANSPORT_MODE_EMOJIS[mode]}
-                                </Text>
-                                <Text style={[
-                                    styles.filterModeLabel,
-                                    { color: isActive ? '#FFFFFF' : colors.text }
-                                ]}>
-                                    {TRANSPORT_MODE_LABELS[mode]}
-                                </Text>
-                                <Text style={[
-                                    styles.filterModeCount,
-                                    { color: isActive ? '#FFFFFF' : colors.textSecondary }
-                                ]}>
-                                    ({count})
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
+                    <TouchableOpacity
+                        style={[
+                            styles.filterModeButton,
+                            currentFilterMode === 'custom' && { backgroundColor: colors.primary },
+                            { borderColor: colors.border }
+                        ]}
+                        onPress={() => handleFilterModeChange('custom')}
+                    >
+                        <Text style={[
+                            styles.filterModeText,
+                            { color: currentFilterMode === 'custom' ? '#FFFFFF' : colors.text }
+                        ]}>
+                            🎛️ Custom Selection
+                        </Text>
+                        <Text style={[
+                            styles.filterModeSubtext,
+                            { color: currentFilterMode === 'custom' ? '#FFFFFF' : colors.textSecondary }
+                        ]}>
+                            Pick specific modes
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.filterModeButton,
+                            currentFilterMode === 'all' && { backgroundColor: colors.primary },
+                            { borderColor: colors.border }
+                        ]}
+                        onPress={() => handleFilterModeChange('all')}
+                    >
+                        <Text style={[
+                            styles.filterModeText,
+                            { color: currentFilterMode === 'all' ? '#FFFFFF' : colors.text }
+                        ]}>
+                            🌍 Show Everything
+                        </Text>
+                        <Text style={[
+                            styles.filterModeSubtext,
+                            { color: currentFilterMode === 'all' ? '#FFFFFF' : colors.textSecondary }
+                        ]}>
+                            All transport modes
+                        </Text>
+                    </TouchableOpacity>
                 </View>
+
+                {/* Custom Mode Selection - only show when custom mode is active */}
+                {currentFilterMode === 'custom' && (
+                    <View style={styles.customModesSection}>
+                        <Text style={[styles.customModesTitle, { color: colors.text }]}>
+                            Select Transport Modes:
+                        </Text>
+                        <View style={styles.customModesGrid}>
+                            {Object.values(TransportMode).filter(mode => mode !== TransportMode.ALL).map((mode) => {
+                                const isActive = customTransportModes.has(mode);
+                                const count = getFilterStats().byMode[mode] || 0;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={mode}
+                                        style={[
+                                            styles.customModeButton,
+                                            {
+                                                backgroundColor: isActive ? colors.primary : colors.backgroundSecondary,
+                                                borderColor: isActive ? colors.primary : colors.border,
+                                            }
+                                        ]}
+                                        onPress={() => toggleCustomTransportMode(mode)}
+                                    >
+                                        <Text style={styles.customModeEmoji}>
+                                            {TRANSPORT_MODE_EMOJIS[mode]}
+                                        </Text>
+                                        <Text style={[
+                                            styles.customModeLabel,
+                                            { color: isActive ? '#FFFFFF' : colors.text }
+                                        ]}>
+                                            {TRANSPORT_MODE_LABELS[mode]}
+                                        </Text>
+                                        <Text style={[
+                                            styles.customModeCount,
+                                            { color: isActive ? '#FFFFFF' : colors.textSecondary }
+                                        ]}>
+                                            ({count})
+                                        </Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+                )}
             </View>
         );
     };
 
-    // Update existing handlers
     const handleSpotPress = (spot: HitchhikingSpot) => {
-        const modeData = getModeSpecificData(spot, activeTransportModes.has(TransportMode.ALL) ? TransportMode.HITCHHIKING : Array.from(activeTransportModes)[0]);
+        const relevantModes = currentFilterMode === 'personal'
+            ? profile?.selectedModes || [TransportMode.HITCHHIKING] // FIXED: selectedModes
+            : currentFilterMode === 'custom'
+                ? Array.from(customTransportModes)
+                : spot.transportModes || [TransportMode.HITCHHIKING];
+
+        const primaryMode = relevantModes[0];
+        const modeEmoji = TRANSPORT_MODE_EMOJIS[primaryMode];
+        const modeLabel = TRANSPORT_MODE_LABELS[primaryMode];
 
         Alert.alert(
             `${spot.name} ${spot.verified ? '✓' : ''}`,
-            `${spot.description}\n\n📊 ${modeData.primaryMetric}\n💡 ${modeData.contextualTip}\n\n⭐ Rating: ${spot.rating}/5\n🛡️ Safety: ${spot.safetyRating}\n👤 Added by: ${spot.addedBy}`,
+            `${spot.description}\n\n${modeEmoji} Great for ${modeLabel}\n⭐ Rating: ${spot.rating}/5\n🛡️ Safety: ${spot.safetyRating}\n👤 Added by: ${spot.addedBy}`,
             [
                 {
-                    text: modeData.quickAction,
-                    onPress: () => handleQuickAction(modeData.quickAction, spot)
+                    text: 'Quick Review',
+                    onPress: () => router.push({
+                        pathname: '/review/add',
+                        params: { spotId: spot.id, spotName: spot.name }
+                    })
                 },
                 {
                     text: 'Full Details',
@@ -241,56 +415,19 @@ export default function MapScreen() {
         );
     };
 
-    const handleQuickAction = (action: string, spot: HitchhikingSpot) => {
-        switch (action) {
-            case 'Quick Review':
-                router.push({
-                    pathname: '/review/add',
-                    params: { spotId: spot.id, spotName: spot.name }
-                });
-                break;
-            case 'Safety Check':
-                Alert.alert('Safety Info', `This spot has a ${spot.safetyRating} safety rating. Check recent reviews for current conditions.`);
-                break;
-            case 'Route Profile':
-                Alert.alert('Route Profile', 'Elevation and cycling route analysis coming soon!');
-                break;
-            case 'Legal Status':
-                Alert.alert('Legal Status', 'Parking and overnight legality information coming soon!');
-                break;
-            default:
-                handleNavigateToSpot(spot);
-        }
-    };
     const handleMapPress = (coordinate: { latitude: number; longitude: number }) => {
         console.log('🗺️ Map tapped at:', coordinate);
 
-        const isNearExistingSpot = filteredSpots.some(spot => {
-            const distance = getDistanceBetweenPoints(
-                coordinate.latitude,
-                coordinate.longitude,
-                spot.coordinates.latitude,
-                spot.coordinates.longitude
-            );
-            return distance < 100;
-        });
-
-        if (isNearExistingSpot) {
-            console.log('🚫 Too close to existing spot');
-            return;
-        }
-
         Alert.alert(
-            '📍 Add Sustainable Transport Spot',
-            `Add a new spot at this location?\n\nLatitude: ${coordinate.latitude.toFixed(6)}\nLongitude: ${coordinate.longitude.toFixed(6)}`,
+            '📍 Add New Spot',
+            `Add a new sustainable transport spot here?`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: '✅ Add Spot',
                     onPress: () => {
-                        console.log('✅ Navigating to add spot with coordinates:', coordinate);
                         router.push({
-                            pathname: '/spots/add', // Fix 2: This is correct if add-spot is in tabs
+                            pathname: '/spots/add',
                             params: {
                                 latitude: coordinate.latitude.toString(),
                                 longitude: coordinate.longitude.toString(),
@@ -302,37 +439,18 @@ export default function MapScreen() {
         );
     };
 
-    // Helper functions (keep existing ones)
-    const getDistanceBetweenPoints = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-        const R = 6371000;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLng = (lng2 - lng1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLng/2) * Math.sin(dLng/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    };
+    // REMOVED: handleCacheDebug function since getCacheStats doesn't exist
 
-    const handleMyLocationPress = () => {
-        Alert.alert('My Location', 'Centering map on your current location...');
-    };
+    const getStatsBarText = () => {
+        if (isLoading) return 'Loading spots...';
 
-    const handleFilterPress = () => {
-        setShowFilterPanel(!showFilterPanel);
-    };
+        const stats = getFilterStats();
+        const modeDescription =
+            currentFilterMode === 'personal' ? `${profile?.selectedModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join('')} personalized` : // FIXED: selectedModes
+                currentFilterMode === 'custom' ? `${Array.from(customTransportModes).map(m => TRANSPORT_MODE_EMOJIS[m]).join('')} custom` :
+                    '🌍 all modes';
 
-    const handleSearchPress = () => {
-        Alert.alert('Search', 'Search for specific locations or spot types');
-    };
-
-    const handleNavigateToSpot = (spot: HitchhikingSpot) => {
-        mapRef.current?.animateToCoordinate(spot.coordinates);
-        Alert.alert('Navigation', `Opening navigation to ${spot.name}`);
-    };
-
-    const handleRegionChange = (region: Region) => {
-        console.log('Region changed:', region);
+        return `📍 ${stats.total} spots (${modeDescription}) • 🛡️ ${stats.highSafety} safe • ✓ ${stats.verified} verified\n💡 Tap map to add spot • 🎛️ Tap filter to change modes`;
     };
 
     return (
@@ -345,7 +463,7 @@ export default function MapScreen() {
                         color: colors.text,
                         borderColor: colors.border
                     }]}
-                    placeholder="Search sustainable transport spots..."
+                    placeholder="Search spots for your travel style..."
                     placeholderTextColor={colors.textSecondary}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
@@ -354,50 +472,46 @@ export default function MapScreen() {
                 />
             </View>
 
-            {/* Transport Mode Filter Panel */}
-            {renderTransportModeFilters()}
+            {/* Filter Panel */}
+            {renderFilterPanel()}
 
             {/* Map */}
             <HitchhikingMapView
                 ref={mapRef}
-                style={[styles.map, showFilterPanel && { marginTop: 180 }]}
-                spots={filteredSpots}
+                style={[styles.map, showFilterPanel && { marginTop: 400 }]}
+                spots={spots}
                 onSpotPress={handleSpotPress}
                 onMapPress={handleMapPress}
-                onRegionChange={handleRegionChange}
                 showUserLocation={true}
             />
 
             {/* Map Controls */}
             <MapControls
-                onMyLocationPress={handleMyLocationPress}
-                onFilterPress={handleFilterPress}
-                onSearchPress={handleSearchPress}
+                onMyLocationPress={() => {
+                    if (userLocation) {
+                        mapRef.current?.animateToCoordinate(userLocation);
+                    } else {
+                        getUserLocation();
+                    }
+                }}
+                onFilterPress={() => setShowFilterPanel(!showFilterPanel)}
+                onSearchPress={() => Alert.alert('Search', 'Search functionality coming soon!')}
             />
 
             {/* Enhanced Stats Bar */}
             <View style={[styles.statsBar, { backgroundColor: `${colors.primary}F0` }]}>
                 <Text style={styles.statsText}>
-                    {activeTransportModes.size === Object.values(TransportMode).length ? (
-                        // All modes active - show general stats
-                        `📍 ${stats.total} spots ${searchQuery ? `matching "${searchQuery}"` : 'in area'} • 🛡️ ${stats.highSafety} high safety • ✓ ${stats.verified} verified`
-                    ) : (
-                        // Filtered view - show mode-specific stats
-                        `${Array.from(activeTransportModes).map(mode => TRANSPORT_MODE_EMOJIS[mode]).join('')} ${stats.total} filtered spots • 🛡️ ${stats.highSafety} safe • ✓ ${stats.verified} verified`
-                    )}
-                    {'\n💡 Tap empty area to add spot • 🎛️ Tap filter to change modes'}
+                    {getStatsBarText()}
                 </Text>
             </View>
         </Screen>
     );
 }
 
-// Add new styles
 const styles = StyleSheet.create({
     map: {
         flex: 1,
     },
-
     searchContainer: {
         position: 'absolute',
         top: Layout.spacing.lg,
@@ -405,10 +519,9 @@ const styles = StyleSheet.create({
         right: Layout.spacing.base,
         zIndex: 1000,
     },
-
     searchInput: {
         paddingHorizontal: Layout.spacing.base,
-        paddingVertical: Layout.spacing.sm + 4, // 12px
+        paddingVertical: Layout.spacing.sm + 4,
         borderRadius: Layout.radius.lg,
         fontSize: Typography.sizes.base,
         fontFamily: Typography.fonts.regular,
@@ -419,7 +532,6 @@ const styles = StyleSheet.create({
         elevation: 4,
         borderWidth: 1,
     },
-
     filterPanel: {
         position: 'absolute',
         top: 80,
@@ -434,69 +546,87 @@ const styles = StyleSheet.create({
         shadowRadius: 8,
         elevation: 4,
         borderWidth: 1,
+        maxHeight: 350,
     },
-
     filterHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: Layout.spacing.sm + 4, // 12px
+        marginBottom: Layout.spacing.base,
     },
-
     filterTitle: {
-        fontSize: Typography.sizes.base,
+        fontSize: Typography.sizes.lg,
         fontFamily: Typography.fonts.semiBold,
         fontWeight: '600',
     },
-
-    clearButton: {
-        fontSize: Typography.sizes.sm,
-        fontFamily: Typography.fonts.medium,
-        fontWeight: '500',
+    closeButton: {
+        fontSize: Typography.sizes.lg,
+        fontWeight: 'bold',
+        padding: 4,
     },
-
-    transportModeFilters: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        gap: Layout.spacing.xs + 4, // 8px
+    filterModeSection: {
+        marginBottom: Layout.spacing.base,
     },
-
-    transportModeFilter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: Layout.spacing.sm + 4, // 12px
-        paddingVertical: Layout.spacing.xs + 4, // 8px
-        borderRadius: Layout.radius.full,
-        borderWidth: 2,
+    filterModeButton: {
+        padding: Layout.spacing.base,
+        borderRadius: Layout.radius.base,
+        borderWidth: 1,
+        marginBottom: Layout.spacing.sm,
     },
-
-    filterModeEmoji: {
+    filterModeText: {
         fontSize: Typography.sizes.base,
-        marginRight: 6,
+        fontFamily: Typography.fonts.semiBold,
+        fontWeight: '600',
+        marginBottom: 2,
     },
-
-    filterModeLabel: {
+    filterModeSubtext: {
         fontSize: Typography.sizes.xs,
-        fontFamily: Typography.fonts.medium,
-        fontWeight: '500',
-        marginRight: 4,
-    },
-
-    filterModeCount: {
-        fontSize: 11,
         fontFamily: Typography.fonts.regular,
     },
-
+    customModesSection: {
+        marginBottom: Layout.spacing.base,
+    },
+    customModesTitle: {
+        fontSize: Typography.sizes.sm,
+        fontFamily: Typography.fonts.medium,
+        marginBottom: Layout.spacing.sm,
+    },
+    customModesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: Layout.spacing.xs,
+    },
+    customModeButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: Layout.spacing.sm,
+        paddingVertical: Layout.spacing.xs,
+        borderRadius: Layout.radius.full,
+        borderWidth: 1,
+        marginBottom: Layout.spacing.xs,
+    },
+    customModeEmoji: {
+        fontSize: Typography.sizes.sm,
+        marginRight: 4,
+    },
+    customModeLabel: {
+        fontSize: Typography.sizes.xs,
+        fontFamily: Typography.fonts.medium,
+        marginRight: 4,
+    },
+    customModeCount: {
+        fontSize: 10,
+        fontFamily: Typography.fonts.regular,
+    },
     statsBar: {
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        paddingVertical: Layout.spacing.sm + 4, // 12px
+        paddingVertical: Layout.spacing.sm + 4,
         paddingHorizontal: Layout.spacing.base,
         zIndex: 1000,
     },
-
     statsText: {
         color: '#FFFFFF',
         fontSize: Typography.sizes.xs,

@@ -1,5 +1,6 @@
-// app/contexts/AuthContext.tsx - Simplified version
+// app/contexts/AuthContext.tsx - Fix authentication
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { apiClient } from '@/app/services/api';
 
 interface User {
     id: string;
@@ -21,6 +22,8 @@ interface AuthContextType {
     verifyMagicLink: (token: string, email: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
+    // Add method to set dev token
+    setDevToken: (token: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,41 +33,103 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // Simulate auth check and auto-login
-        setTimeout(() => {
-            const mockUser: User = {
-                id: 'mock-user-123',
-                email: 'dev@vendro.app',
-                username: 'devuser',
-                display_name: 'Dev User',
-                vendro_points: 100,
-                safety_rating: 4.5,
-                is_verified: true,
-                created_at: new Date().toISOString(),
-            };
-
-            setUser(mockUser);
-            setIsLoading(false);
-            console.log('🔓 Auth disabled - auto-logged in as dev user');
-        }, 500); // Short delay to simulate loading
+        initializeAuth();
     }, []);
 
-    // Mock functions (no-op)
+    const initializeAuth = async () => {
+        setIsLoading(true);
+        try {
+            if (__DEV__) {
+                // For development, create a dev user with a real JWT token
+                await loginAsDevelopmentUser();
+            } else {
+                // Production auth logic here
+                setIsLoading(false);
+            }
+        } catch (error) {
+            console.error('Auth initialization failed:', error);
+            setIsLoading(false);
+        }
+    };
+
+    const loginAsDevelopmentUser = async () => {
+        try {
+            // First, try to send a magic link to dev user
+            console.log('🔐 Setting up development authentication...');
+
+            const devEmail = 'dev@vendro.app';
+
+            // Send magic link
+            await apiClient.sendMagicLink(devEmail);
+            console.log('📧 Magic link sent to dev user');
+
+            // In development, we'll use a predictable token
+            // This is just for development - never do this in production!
+            const devToken = 'dev-magic-token-12345';
+
+            // Verify magic link with dev token
+            const authResult = await apiClient.verifyMagicLink(devToken, devEmail);
+
+            // Set the token in API client
+            apiClient.setToken(authResult.data.accessToken);
+
+            setUser(authResult.data.user);
+            setIsLoading(false);
+
+            console.log('✅ Development user authenticated:', authResult.data.user.email);
+        } catch (error) {
+            console.error('❌ Development auth failed:', error);
+
+            // Fallback: create a mock token for development
+            const mockToken = 'mock-dev-token-' + Date.now();
+            apiClient.setToken(mockToken);
+
+            // Try to get user info with mock token
+            try {
+                const userResult = await apiClient.getCurrentUser();
+                setUser(userResult.data);
+                console.log('✅ Development user loaded with mock token');
+            } catch (userError) {
+                console.warn('⚠️ Could not load user, continuing without auth');
+            }
+
+            setIsLoading(false);
+        }
+    };
+
     const sendMagicLink = async (email: string) => {
-        console.log('📧 Mock: Magic link sent to', email);
+        await apiClient.sendMagicLink(email);
     };
 
     const verifyMagicLink = async (token: string, email: string) => {
-        console.log('✅ Mock: Magic link verified');
+        const result = await apiClient.verifyMagicLink(token, email);
+        apiClient.setToken(result.data.accessToken);
+        setUser(result.data.user);
     };
 
     const logout = async () => {
-        console.log('👋 Mock: Logged out');
+        try {
+            await apiClient.logout();
+        } catch (error) {
+            console.warn('Logout API call failed:', error);
+        }
+
+        apiClient.setToken(null);
         setUser(null);
     };
 
     const refreshUser = async () => {
-        console.log('🔄 Mock: User refreshed');
+        try {
+            const result = await apiClient.getCurrentUser();
+            setUser(result.data);
+        } catch (error) {
+            console.error('Failed to refresh user:', error);
+        }
+    };
+
+    const setDevToken = (token: string) => {
+        apiClient.setToken(token);
+        console.log('🔧 Development token set:', token);
     };
 
     return (
@@ -72,11 +137,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             value={{
                 user,
                 isLoading,
-                isAuthenticated: true, // Always authenticated in dev mode
+                isAuthenticated: !!user,
                 sendMagicLink,
                 verifyMagicLink,
                 logout,
                 refreshUser,
+                setDevToken,
             }}
         >
             {children}
