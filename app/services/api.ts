@@ -78,7 +78,7 @@ class ApiClient {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...(this.token && {Authorization: `Bearer ${this.token}`}),
+                ...(this.token && { Authorization: `Bearer ${this.token}` }),
                 ...options.headers,
             },
         };
@@ -110,7 +110,7 @@ class ApiClient {
     async sendMagicLink(email: string) {
         return this.request<{ message: string; email: string }>('/auth/magic-link', {
             method: 'POST',
-            body: JSON.stringify({email}),
+            body: JSON.stringify({ email }),
         });
     }
 
@@ -121,7 +121,7 @@ class ApiClient {
             message: string;
         }>('/auth/verify', {
             method: 'POST',
-            body: JSON.stringify({token, email}),
+            body: JSON.stringify({ token, email }),
         });
     }
 
@@ -267,6 +267,8 @@ class ApiClient {
     }
 
 
+
+
     async getNearbySpots(latitude: number, longitude: number, radius = 10, limit = 20) {
         return this.request<any[]>(
             `/spots/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&limit=${limit}`
@@ -383,10 +385,9 @@ class ApiClient {
     async addSpotToTrip(tripId: string, spotId: string, orderIndex?: number) {
         return this.request<any>(`/trips/${tripId}/spots`, {
             method: 'POST',
-            body: JSON.stringify({spot_id: spotId, order_index: orderIndex}),
+            body: JSON.stringify({ spot_id: spotId, order_index: orderIndex }),
         });
     }
-
     async getUserProfile(userId: string) {
         return this.request<any>(`/users/me/profile`); // Changed from /users/${userId}/profile
     }
@@ -412,7 +413,7 @@ class ApiClient {
             body: JSON.stringify(profileData),
         });
     }
-}
+    }
 
 
 export const apiClient = new ApiClient(API_BASE_URL);
