@@ -1,4 +1,4 @@
-// app/onboarding/travel-modes.tsx
+// app/onboarding/travel-modes.tsx - FIXED VERSION
 import React, { useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Text } from '@/components/Themed';
@@ -45,6 +45,8 @@ const TRAVEL_MODE_OPTIONS = [
 
 export default function TravelModesOnboarding() {
     const [selectedModes, setSelectedModes] = useState<Set<TransportMode>>(new Set());
+    const [isLoading, setIsLoading] = useState(false);
+
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const { updateProfile } = useProfile();
@@ -57,33 +59,64 @@ export default function TravelModesOnboarding() {
             } else {
                 newModes.add(mode);
             }
+            console.log('🎯 Selected modes updated:', Array.from(newModes));
             return newModes;
         });
     };
 
     const handleContinue = async () => {
         if (selectedModes.size === 0) {
-            Alert.alert('Select Travel Style', 'Please select at least one way you like to travel.');
+            Alert.alert('Selection Required', 'Please select at least one way you like to travel.');
             return;
         }
 
-        try {
-            // Update user profile with selected modes
-            await updateProfile({
-                travelModes: Array.from(selectedModes),
-                preferences: {
-                    primaryMode: Array.from(selectedModes)[0], // First selected becomes primary
-                    showAllSpots: false, // Start with filtered view
-                    experienceLevel: 'beginner',
-                    safetyPriority: 'high'
-                },
-                onboardingCompleted: true
-            });
+        setIsLoading(true);
 
-            // Navigate to main app
-            router.replace('/(tabs)/home');
-        } catch (error) {
-            Alert.alert('Error', 'Could not save preferences. Please try again.');
+        try {
+            console.log('🚀 Starting profile save process...');
+            console.log('📋 Selected modes:', Array.from(selectedModes));
+
+            // FIXED: Match your TravelProfile interface exactly
+            const profileUpdates = {
+                selectedModes: Array.from(selectedModes), // FIXED: Use selectedModes, not travelModes
+                primaryMode: Array.from(selectedModes)[0], // FIXED: Top-level property, not nested
+                showAllSpots: false, // FIXED: Top-level property
+                experienceLevel: 'beginner' as const, // FIXED: Top-level property
+                safetyPriority: 'high' as const, // FIXED: Top-level property
+                onboardingCompleted: true
+            };
+
+            console.log('📤 Sending profile updates:', profileUpdates);
+
+            await updateProfile(profileUpdates);
+
+            console.log('✅ Profile saved successfully, navigating to home...');
+
+            // Show success message
+            Alert.alert(
+                'Welcome to Vendro! 🎉',
+                'Your travel preferences have been saved. You\'ll now see personalized spots and recommendations.',
+                [
+                    {
+                        text: 'Explore Now',
+                        onPress: () => router.replace('/(tabs)/home')
+                    }
+                ]
+            );
+
+        } catch (error: any) {
+            console.error('❌ Failed to save profile:', error);
+
+            Alert.alert(
+                'Save Failed',
+                `Could not save your travel preferences: ${error.message}\n\nPlease try again.`,
+                [
+                    { text: 'Retry', onPress: handleContinue },
+                    { text: 'Cancel' }
+                ]
+            );
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -166,10 +199,13 @@ export default function TravelModesOnboarding() {
                     }
                 ]}
                 onPress={handleContinue}
-                disabled={selectedModes.size === 0}
+                disabled={selectedModes.size === 0 || isLoading}
             >
                 <Text style={styles.continueButtonText}>
-                    Continue with {selectedModes.size} travel {selectedModes.size === 1 ? 'style' : 'styles'}
+                    {isLoading
+                        ? '💾 Saving preferences...'
+                        : `Continue with ${selectedModes.size} travel ${selectedModes.size === 1 ? 'style' : 'styles'}`
+                    }
                 </Text>
             </TouchableOpacity>
 
@@ -177,11 +213,28 @@ export default function TravelModesOnboarding() {
             <TouchableOpacity
                 style={styles.skipButton}
                 onPress={() => router.replace('/(tabs)/home')}
+                disabled={isLoading}
             >
                 <Text style={[styles.skipButtonText, { color: colors.textSecondary }]}>
                     Skip for now
                 </Text>
             </TouchableOpacity>
+
+            {/* Debug Info (Dev only) */}
+            {__DEV__ && (
+                <Card style={styles.debugCard}>
+                    <Text style={[styles.debugTitle, { color: colors.text }]}>🧪 Debug Info</Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                        Selected: {Array.from(selectedModes).join(', ') || 'None'}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                        Count: {selectedModes.size}
+                    </Text>
+                    <Text style={[styles.debugText, { color: colors.textSecondary }]}>
+                        Primary will be: {Array.from(selectedModes)[0] || 'None'}
+                    </Text>
+                </Card>
+            )}
         </Screen>
     );
 }
@@ -287,5 +340,20 @@ const styles = StyleSheet.create({
     skipButtonText: {
         fontSize: Typography.sizes.sm,
         fontFamily: Typography.fonts.medium,
+    },
+    debugCard: {
+        backgroundColor: '#f5f5f5',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        marginTop: Layout.spacing.base,
+    },
+    debugTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    debugText: {
+        fontSize: 12,
+        fontFamily: 'monospace',
     },
 });
