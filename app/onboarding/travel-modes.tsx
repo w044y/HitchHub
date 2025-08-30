@@ -89,7 +89,6 @@ export default function TravelModesOnboarding() {
             console.log('📤 Sending profile updates:', profileUpdates);
 
             await updateProfile(profileUpdates);
-
             console.log('✅ Profile saved successfully, navigating to home...');
 
             // Show success message

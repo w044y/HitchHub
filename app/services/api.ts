@@ -78,7 +78,10 @@ class ApiClient {
             ...options,
             headers: {
                 'Content-Type': 'application/json',
-                ...(this.token && { Authorization: `Bearer ${this.token}` }),
+                // ONLY add auth header if we have a valid token
+                ...(this.token && !this.token.includes('mock') && !this.token.includes('dev-token') && {
+                    Authorization: `Bearer ${this.token}`
+                }),
                 ...options.headers,
             },
         };
@@ -389,31 +392,51 @@ class ApiClient {
         });
     }
     async getUserProfile(userId: string) {
-        return this.request<any>(`/users/me/profile`); // Changed from /users/${userId}/profile
+        if (__DEV__) {
+            console.log('🔧 DEV: Returning mock profile response');
+            // Return mock "not found" to trigger profile creation flow
+            throw new Error('Profile not found - onboarding needed');
+        }
+        return this.request<any>(`/users/me/profile`);
     }
 
-    async updateUserProfile(userId: string, profileData: {
-        travelModes?: TransportMode[];
-        primaryMode?: TransportMode;
-        showAllSpots?: boolean;
-        experienceLevel?: 'beginner' | 'intermediate' | 'expert';
-        safetyPriority?: 'high' | 'medium' | 'low';
-        onboardingCompleted?: boolean;
-    }) {
-        return this.request<any>(`/users/me/profile`, { // Changed from /users/${userId}/profile
+
+    async updateUserProfile(userId: string, profileData: any) {
+        if (__DEV__) {
+            console.log('🔧 DEV: Mock profile update success');
+            return {
+                data: {
+                    userId: userId,
+                    travelModes: profileData.travelModes,
+                    preferences: {
+                        primaryMode: profileData.primaryMode,
+                        showAllSpots: profileData.showAllSpots,
+                        experienceLevel: profileData.experienceLevel,
+                        safetyPriority: profileData.safetyPriority,
+                    },
+                    onboardingCompleted: profileData.onboardingCompleted,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                }
+            };
+        }
+        return this.request<any>(`/users/me/profile`, {
             method: 'PUT',
             body: JSON.stringify(profileData),
         });
     }
 
-
     async createUserProfile(userId: string, profileData: any) {
-        return this.request<any>(`/users/me/profile`, { // Changed from /users/${userId}/profile
+        if (__DEV__) {
+            console.log('🔧 DEV: Mock profile creation success');
+            return this.updateUserProfile(userId, profileData); // Same mock response
+        }
+        return this.request<any>(`/users/me/profile`, {
             method: 'POST',
             body: JSON.stringify(profileData),
         });
     }
-    }
+}
 
 
 export const apiClient = new ApiClient(API_BASE_URL);

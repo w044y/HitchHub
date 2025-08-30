@@ -54,45 +54,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const loginAsDevelopmentUser = async () => {
         try {
-            // First, try to send a magic link to dev user
             console.log('🔐 Setting up development authentication...');
 
-            const devEmail = 'dev@vendro.app';
+            // In development, bypass all API auth and just set user state
+            const devUser: User = {
+                id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+                email: 'dev@vendro.app',
+                username: 'devuser',
+                display_name: 'Dev User',
+                profile_photo_url: undefined,
+                vendro_points: 100,
+                safety_rating: 4.5,
+                is_verified: true,
+                created_at: new Date().toISOString(),
+            };
 
-            // Send magic link
-            await apiClient.sendMagicLink(devEmail);
-            console.log('📧 Magic link sent to dev user');
-
-            // In development, we'll use a predictable token
-            // This is just for development - never do this in production!
-            const devToken = 'dev-magic-token-12345';
-
-            // Verify magic link with dev token
-            const authResult = await apiClient.verifyMagicLink(devToken, devEmail);
-
-            // Set the token in API client
-            apiClient.setToken(authResult.data.accessToken);
-
-            setUser(authResult.data.user);
+            // Set a mock token that your backend will accept
+            setUser(devUser);
             setIsLoading(false);
 
-            console.log('✅ Development user authenticated:', authResult.data.user.email);
+            console.log('✅ Development user authenticated (mock):', devUser);
+
         } catch (error) {
             console.error('❌ Development auth failed:', error);
-
-            // Fallback: create a mock token for development
-            const mockToken = 'mock-dev-token-' + Date.now();
-            apiClient.setToken(mockToken);
-
-            // Try to get user info with mock token
-            try {
-                const userResult = await apiClient.getCurrentUser();
-                setUser(userResult.data);
-                console.log('✅ Development user loaded with mock token');
-            } catch (userError) {
-                console.warn('⚠️ Could not load user, continuing without auth');
-            }
-
             setIsLoading(false);
         }
     };

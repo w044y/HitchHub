@@ -12,7 +12,7 @@ import { Layout } from '@/constants/Layout';
 
 export default function Index() {
     const { isLoading: authLoading, isAuthenticated } = useAuth();
-    const { profile, isLoading: profileLoading, error: profileError, retryLoading } = useProfile();
+    const { profile, isLoading: profileLoading, error: profileError} = useProfile();
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
 
@@ -83,7 +83,7 @@ export default function Index() {
 
                     <TouchableOpacity
                         style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                        onPress={retryLoading}
+
                     >
                         <Text style={styles.retryButtonText}>🔄 Try Again</Text>
                     </TouchableOpacity>

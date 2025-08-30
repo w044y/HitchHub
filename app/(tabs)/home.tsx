@@ -30,7 +30,7 @@ export default function HomeScreen() {
             />
         );
     }
-
+    console.log("profile" + profile)
     // Handle error states
     if (error === 'onboarding_required' || !profile) {
         return (
