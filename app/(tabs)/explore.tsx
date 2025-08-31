@@ -16,6 +16,8 @@ import { Layout } from "@/constants/Layout";
 import { useProfile } from "@/app/contexts/ProfileContext";
 import * as Location from 'expo-location';
 
+// app/(tabs)/explore.tsx - FIXED VERSION
+
 export default function MapScreen() {
     const [spots, setSpots] = useState<HitchhikingSpot[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
@@ -27,96 +29,19 @@ export default function MapScreen() {
     const [currentFilterMode, setCurrentFilterMode] = useState<'personal' | 'all' | 'custom'>('personal');
     const [customTransportModes, setCustomTransportModes] = useState<Set<TransportMode>>(new Set());
     const [showFilterPanel, setShowFilterPanel] = useState(false);
-    const loadingSpotsRef = useRef(false);
-    const lastLoadParamsRef = useRef<string>('');
+
+    // FIXED: Remove the loading ref that was causing issues
+    const [hasInitialized, setHasInitialized] = useState(false);
 
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const mapRef = useRef<MapViewHandle>(null);
 
-    // Debounce utility function
-    function debounce<T extends (...args: any[]) => void>(func: T, delay: number): T {
-        let timeoutId: number;
-        return ((...args: any[]) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => func.apply(null, args), delay);
-        }) as T;
-    }
-
-    const loadSpotsDebounced = useCallback(
-        debounce(() => {
-            if (!loadingSpotsRef.current) {
-                loadSpots();
-            }
-        }, 300),
-        [currentFilterMode, customTransportModes, userLocation, profile]
-    );
-
-    useEffect(() => {
-        getUserLocation();
-    }, []);
-
-    useEffect(() => {
-        if (profile) {
-            // FIXED: Use selectedModes instead of travelModes
-            setCustomTransportModes(new Set(profile.selectedModes));
-
-            const currentParams = JSON.stringify({
-                filterMode: currentFilterMode,
-                customModes: Array.from(customTransportModes).sort(),
-                hasLocation: !!userLocation,
-                profileModes: profile.selectedModes.sort() // FIXED: selectedModes
-            });
-
-            if (currentParams !== lastLoadParamsRef.current) {
-                lastLoadParamsRef.current = currentParams;
-                console.log('🔄 Parameters changed, loading spots...');
-                loadSpotsDebounced();
-            } else {
-                console.log('⏭️ Parameters unchanged, skipping API call');
-            }
-        }
-    }, [profile, currentFilterMode, customTransportModes, userLocation, loadSpotsDebounced]);
-
-    const getUserLocation = async () => {
-        try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                console.warn('Location permission denied');
-                if (profile) loadSpotsDebounced();
-                return;
-            }
-
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-            });
-
-            const newLocation = {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-            };
-
-            if (!userLocation ||
-                Math.abs(userLocation.latitude - newLocation.latitude) > 0.001 ||
-                Math.abs(userLocation.longitude - newLocation.longitude) > 0.001
-            ) {
-                setUserLocation(newLocation);
-                console.log('✅ Location updated:', newLocation);
-            }
-        } catch (error) {
-            console.error('❌ Error getting location:', error);
-            if (profile) loadSpotsDebounced();
-        }
-    };
-
-    const loadSpots = async () => {
-        if (loadingSpotsRef.current) {
-            console.log('⏭️ Already loading spots, skipping...');
-            return;
-        }
+    // FIXED: Stable loadSpots function without debounce dependency issues
+    const loadSpots = useCallback(async () => {
+        if (!profile) return;
 
         try {
-            loadingSpotsRef.current = true;
             setIsLoading(true);
             console.log('🔍 Loading spots with smart filtering...');
 
@@ -124,16 +49,11 @@ export default function MapScreen() {
 
             switch (currentFilterMode) {
                 case 'personal':
-                    // FIXED: Use profile.selectedModes and basic getSpots with filters
-                    const personalModes = profile?.selectedModes || [TransportMode.HITCHHIKING];
+                    const personalModes = profile.selectedModes || [TransportMode.HITCHHIKING];
                     console.log('👤 Loading personal spots for modes:', personalModes);
 
                     response = await apiClient.getSpots({
                         limit: 100,
-                        ...(userLocation && {
-                            // For now, just get all spots and filter client-side
-                            // TODO: Implement transport mode filtering in backend
-                        })
                     });
 
                     // Client-side filtering for now
@@ -195,22 +115,65 @@ export default function MapScreen() {
             });
 
             setSpots(convertedSpots);
-
-            const filterDescription =
-                currentFilterMode === 'personal' ? `your ${profile?.selectedModes.map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')} preferences` :
-                    currentFilterMode === 'custom' ? `${Array.from(customTransportModes).map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')} modes` :
-                        'all transport modes';
-
-            console.log(`✅ Loaded ${convertedSpots.length} spots filtered for ${filterDescription}`);
+            console.log(`✅ Loaded ${convertedSpots.length} spots`);
 
         } catch (error) {
             console.error('❌ Error loading spots:', error);
             Alert.alert('Error', 'Could not load spots from server');
         } finally {
             setIsLoading(false);
-            loadingSpotsRef.current = false;
+        }
+    }, [profile, currentFilterMode, customTransportModes]); // FIXED: Stable dependencies
+
+    // FIXED: Initialize custom modes once when profile loads
+    useEffect(() => {
+        if (profile && !hasInitialized) {
+            setCustomTransportModes(new Set(profile.selectedModes));
+            setHasInitialized(true);
+            console.log('🔄 Profile loaded, initializing custom modes:', profile.selectedModes);
+        }
+    }, [profile, hasInitialized]);
+
+    // FIXED: Load spots when dependencies actually change
+    useEffect(() => {
+        if (profile && hasInitialized) {
+            console.log('🔄 Dependencies changed, loading spots...');
+            loadSpots();
+        }
+    }, [profile, currentFilterMode, customTransportModes, hasInitialized, loadSpots]);
+
+    // Get user location effect (unchanged)
+    useEffect(() => {
+        getUserLocation();
+    }, []);
+
+    // FIXED: Remove the debounced function and complex parameter checking
+    // The rest of your component code stays the same...
+
+    const getUserLocation = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                console.warn('Location permission denied');
+                return;
+            }
+
+            const location = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.Balanced,
+            });
+
+            const newLocation = {
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude,
+            };
+
+            setUserLocation(newLocation);
+            console.log('✅ Location updated:', newLocation);
+        } catch (error) {
+            console.error('❌ Error getting location:', error);
         }
     };
+
 
     const handleFilterModeChange = (newMode: 'personal' | 'all' | 'custom') => {
         if (newMode === currentFilterMode) return;

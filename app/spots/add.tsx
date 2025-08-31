@@ -20,6 +20,7 @@ import { Layout } from '@/constants/Layout';
 import { useColorScheme } from '@/components/useColorScheme';
 import { router, useLocalSearchParams } from 'expo-router';
 import { apiClient } from '@/app/services/api';
+import {apiCache} from "@/app/services/api-cache";
 
 const SPOT_TYPES = [
     { value: 'highway_entrance', label: 'Highway Entrance', emoji: '🛣️' },
@@ -251,6 +252,7 @@ export default function AddSpotScreen() {
             };
 
             await apiClient.createSpot(spotData);
+            apiCache.invalidate('spots');
 
             Alert.alert(
                 'Success! 🎉',
