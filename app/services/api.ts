@@ -1,442 +1,658 @@
-import { Platform } from 'react-native';
-import {TransportMode} from "@/app/types/transport";
-import {TravelProfile} from "@/app/types/profile";
-import {apiCache} from "@/app/services/api-cache";
+// app/services/api.ts - Complete API Client with ProfileContext support
+import { TransportMode } from '@/app/types/transport';
 
-const getApiBaseUrl = () => {
-    if (__DEV__) {
-        // Replace with YOUR computer's IP address
-        const YOUR_COMPUTER_IP = ''; // Your current IP
-        return `http://${YOUR_COMPUTER_IP}:3000/api/v1`;
-    }
-    return 'https://your-production-url.com/api/v1';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-interface ApiResponse<T> {
+// API Response Types
+interface ApiResponse<T = any> {
     data: T;
     message?: string;
+    error?: string;
+    statusCode?: number;
+}
+
+interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
     pagination?: {
         limit: number;
         offset: number;
         total: number;
     };
 }
+interface TrustVerificationRequest {
+    type: 'email' | 'phone' | 'social_facebook' | 'social_google' | 'community_vouch';
+    metadata?: {
+        platform?: string;
+        verified_by?: string;
+        verification_date?: string;
+        [key: string]: any;
+    };
+}
+
+export interface TrustVerificationResponse {
+    id: string;
+    type: string;
+    verified: boolean;
+    metadata: any;
+    created_at: string;
+}
+// Profile-related Types
+interface UserProfileResponse {
+    userId: string;
+    travelModes: TransportMode[];
+    primaryMode: TransportMode;
+    experienceLevel: 'beginner' | 'intermediate' | 'expert';
+    safetyPriority: 'high' | 'medium' | 'low';
+    showAllSpots: boolean;
+
+    // Phase 1: Trust & Credibility
+    emailVerified: boolean;
+    phoneVerified: boolean;
+    socialConnected: boolean;
+    communityVouches: number;
+    totalReviews: number;
+    helpfulReviews: number;
+    reviewerRating: number;
+    spotsAdded: number;
+    verifiedSpots: number;
+
+    // Phase 2: Personality & Gamification
+    bio?: string;
+    languages: string[];
+    countriesVisited: string[];
+    publicProfile: boolean;
+    showStats: boolean;
+
+    onboardingCompleted: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+interface CompleteUserProfileResponse {
+    profile: UserProfileResponse;
+    trustScore: number;
+    badges: Badge[];
+    badgeCounts: BadgeCounts;
+    memberSince: string;
+    isNewMember: boolean;
+}
+
+interface Badge {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    emoji: string;
+    category: string;
+    level?: string;
+    earnedAt: string;
+}
+
+interface BadgeCounts {
+    total: number;
+    trust: number;
+    reviewer: number;
+    contributor: number;
+    explorer: number;
+    community: number;
+    special: number;
+    gold: number;
+    silver: number;
+    bronze: number;
+}
+
+interface UserStatsResponse {
+    hitchhiking?: {
+        totalRides: number;
+        totalDistance: number;
+        averageRating: number;
+        lastRide?: string;
+    };
+    cycling?: {
+        totalDistance: number;
+        totalRoutes: number;
+        lastRide?: string;
+    };
+    vanCamping?: {
+        totalNights: number;
+        favoriteSpots: number;
+        lastStay?: string;
+    };
+    walking?: {
+        totalDistance: number;
+        citiesExplored: number;
+        lastWalk?: string;
+    };
+}
+
+// Auth Types
+interface AuthResponse {
+    user: any;
+    accessToken: string;
+    message: string;
+}
+
+interface MagicLinkResponse {
+    message: string;
+    email: string;
+}
+
+// Spot Types
+interface SpotResponse {
+    id: string;
+    name: string;
+    description: string;
+    latitude: number;
+    longitude: number;
+    spot_type: string;
+    transport_modes: TransportMode[];
+    safety_rating: number;
+    overall_rating: number;
+    mode_ratings: any;
+    total_reviews: number;
+    last_reviewed?: string;
+    is_verified: boolean;
+    photo_urls: string[];
+    facilities: string[];
+    tips?: string;
+    accessibility_info?: string;
+    created_by: {
+        id: string;
+        display_name: string;
+        username: string;
+        safety_rating: number;
+    };
+    created_at: string;
+}
+
+interface CreateSpotRequest {
+    name: string;
+    description: string;
+    latitude: number;
+    longitude: number;
+    spot_type: string;
+    tips?: string;
+    accessibility_info?: string;
+    facilities?: string[];
+    created_by_id?: string;
+}
+
+interface SpotReviewRequest {
+    user_id: string;
+    transport_mode: TransportMode;
+    safety_rating: number;
+    effectiveness_rating: number;
+    overall_rating: number;
+    comment?: string;
+    wait_time_minutes?: number;
+    legal_status?: number;
+    facility_rating?: number;
+    accessibility_rating?: number;
+    review_latitude?: number;
+    review_longitude?: number;
+    photos?: string[];
+    context?: any;
+}
+
+interface SpotReviewResponse {
+    id: string;
+    transport_mode: TransportMode;
+    safety_rating: number;
+    effectiveness_rating: number;
+    overall_rating: number;
+    comment?: string;
+    wait_time_minutes?: number;
+    legal_status?: number;
+    facility_rating?: number;
+    accessibility_rating?: number;
+    location_verified: boolean;
+    distance_from_spot?: number;
+    created_at: string;
+    user: {
+        display_name: string;
+        username: string;
+        safety_rating: number;
+    };
+}
 
 class ApiClient {
     private baseURL: string;
     private token: string | null = null;
-    private pendingRequests = new Map<string, Promise<any>>();
 
-    constructor(baseURL: string) {
+    constructor(baseURL: string = 'http://localhost:3000/api/v1') {
         this.baseURL = baseURL;
+
+        if (__DEV__) {
+            console.log('🔧 ApiClient initialized with base URL:', this.baseURL);
+        }
     }
 
     setToken(token: string | null) {
         this.token = token;
-        console.log('🔑 API Token', token ? 'set' : 'cleared');
-
+        if (__DEV__) {
+            console.log('🔑 API token set:', token ? 'Token available' : 'No token');
+        }
     }
 
-    private async request<T>(
-        endpoint: string,
-        options: RequestInit = {},
-        cacheConfig?: {
-            useCache?: boolean;
-            ttl?: number;
-            cacheKey?: string;
+    private getHeaders(): HeadersInit {
+        const headers: HeadersInit = {
+            'Content-Type': 'application/json',
+        };
+
+        if (this.token) {
+            headers.Authorization = `Bearer ${this.token}`;
         }
+
+        return headers;
+    }
+
+    private async request<T = any>(
+        endpoint: string,
+        options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
-        const method = options.method || 'GET';
-
-        // Generate cache key
-        const defaultCacheKey = apiCache.generateCacheKey(endpoint, {
-            method,
-            body: options.body,
-            headers: options.headers,
-        });
-        const cacheKey = cacheConfig?.cacheKey || defaultCacheKey;
-
-        // For GET requests, check cache first
-        if (method === 'GET' && cacheConfig?.useCache !== false) {
-            const cached = apiCache.get<ApiResponse<T>>(cacheKey, cacheConfig?.ttl);
-            if (cached) {
-                console.log(`💾 Cache HIT: ${endpoint}`);
-                return cached;
-            }
-
-            // Check if request is already in flight
-            if (this.pendingRequests.has(cacheKey)) {
-                console.log(`⏳ Request already pending: ${endpoint}`);
-                return this.pendingRequests.get(cacheKey);
-            }
-        }
 
         const config: RequestInit = {
             ...options,
             headers: {
-                'Content-Type': 'application/json',
-                // ONLY add auth header if we have a valid token
-                ...(this.token && !this.token.includes('mock') && !this.token.includes('dev-token') && {
-                    Authorization: `Bearer ${this.token}`
-                }),
+                ...this.getHeaders(),
                 ...options.headers,
             },
         };
 
-        const requestPromise = this.executeRequest<T>(url, config, endpoint);
-
-        // Store pending request to prevent duplicates
-        if (method === 'GET') {
-            this.pendingRequests.set(cacheKey, requestPromise);
+        if (__DEV__) {
+            console.log(`🌐 API ${config.method || 'GET'} ${url}`,
+                config.body ? JSON.parse(config.body as string) : '');
         }
 
         try {
-            const response = await requestPromise;
+            const response = await fetch(url, config);
+            const data = await response.json();
 
-            // Cache successful GET responses
-            if (method === 'GET' && cacheConfig?.useCache !== false) {
-                apiCache.set(cacheKey, response, cacheConfig?.ttl);
-                console.log(`💾 Cache SET: ${endpoint}`);
+            if (!response.ok) {
+                throw new Error(data.error?.message || `HTTP ${response.status}: ${response.statusText}`);
             }
 
-            return response;
-        } finally {
-            // Clean up pending request
-            this.pendingRequests.delete(cacheKey);
+            if (__DEV__) {
+                console.log(`✅ API Response ${response.status}:`, data);
+            }
+
+            return data;
+        } catch (error) {
+            console.error(`❌ API Error ${config.method || 'GET'} ${url}:`, error);
+            throw error;
         }
     }
 
     // Auth Methods
-    async sendMagicLink(email: string) {
-        return this.request<{ message: string; email: string }>('/auth/magic-link', {
+    async sendMagicLink(email: string): Promise<ApiResponse<MagicLinkResponse>> {
+        return this.request<MagicLinkResponse>('/auth/magic-link', {
             method: 'POST',
             body: JSON.stringify({ email }),
         });
     }
 
-    async verifyMagicLink(token: string, email: string) {
-        return this.request<{
-            user: any;
-            accessToken: string;
-            message: string;
-        }>('/auth/verify', {
+    async verifyMagicLink(token: string, email: string): Promise<ApiResponse<AuthResponse>> {
+        return this.request<AuthResponse>('/auth/verify', {
             method: 'POST',
             body: JSON.stringify({ token, email }),
         });
     }
 
-    async getCurrentUser() {
-        return this.request<any>('/auth/me');
+    async getCurrentUser(): Promise<ApiResponse<any>> {
+        return this.request('/auth/me');
     }
 
-    async refreshToken() {
-        return this.request<{ accessToken: string; user: any }>('/auth/refresh', {
+    async logout(): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/auth/logout', {
             method: 'POST',
         });
     }
 
-    async logout() {
-        return this.request<{ message: string }>('/auth/logout', {
-            method: 'POST',
-        });
+    // User Profile Methods - Phase 1 & 2
+    async getUserProfile(userId: string): Promise<ApiResponse<UserProfileResponse>> {
+        return this.request<UserProfileResponse>(`/users/${userId}/profile`);
     }
 
-    // Users Methods
-    async getUsers(limit = 50, offset = 0) {
-        return this.request<any[]>(`/users?limit=${limit}&offset=${offset}`);
+    async getMyProfile(): Promise<ApiResponse<UserProfileResponse>> {
+        return this.request<UserProfileResponse>('/users/me/profile');
     }
 
-    async getUserById(id: string) {
-        return this.request<any>(`/users/${id}`);
+    async getUserCompleteProfile(userId: string): Promise<ApiResponse<CompleteUserProfileResponse>> {
+        return this.request<CompleteUserProfileResponse>(`/users/${userId}/complete-profile`);
     }
 
-    async updateUser(id: string, userData: any) {
-        return this.request<any>(`/users/${id}`, {
+    async updateUserProfile(userId: string, updates: Partial<UserProfileResponse>): Promise<ApiResponse<UserProfileResponse>> {
+        return this.request<UserProfileResponse>('/users/me/profile', {
             method: 'PUT',
-            body: JSON.stringify(userData),
+            body: JSON.stringify(updates),
         });
     }
 
-    async getUserStats(id: string) {
-        return this.request<any>(`/users/${id}/stats`);
-    }
-
-    private async executeRequest<T>(url: string, config: RequestInit, endpoint: string): Promise<ApiResponse<T>> {
-        try {
-            console.log(`🌐 API ${config.method || 'GET'}: ${url}`);
-
-            const response = await fetch(url, config);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error?.message || `HTTP ${response.status}`);
-            }
-
-            console.log(`✅ API Success: ${endpoint}`);
-            return data;
-        } catch (error) {
-            console.error(`❌ API Error: ${endpoint}`, error);
-            throw error;
-        }
-    }
-
-
-    async getSpots(filters: {
-        limit?: number;
-        offset?: number;
-        spot_type?: string;
-        is_verified?: boolean;
-        min_rating?: number;
-    } = {}) {
-        const cacheKey = `spots:basic:${JSON.stringify(filters)}`;
-
-        return this.request<any[]>('/spots', {
-            method: 'GET',
-        }, {
-            useCache: true,
-            ttl: 10 * 60 * 1000, // 10 minutes for basic spots
-            cacheKey
+    async createUserProfile(profileData: Partial<UserProfileResponse>): Promise<ApiResponse<UserProfileResponse>> {
+        return this.request<UserProfileResponse>('/users/me/profile', {
+            method: 'POST',
+            body: JSON.stringify(profileData),
         });
     }
 
+    async deleteUserProfile(): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/profile', {
+            method: 'DELETE',
+        });
+    }
+
+    // Phase 2: Extended Profile Methods
+    async updateExtendedProfile(userId: string, updates: {
+        bio?: string;
+        languages?: string[];
+        countriesVisited?: string[];
+        publicProfile?: boolean;
+        showStats?: boolean;
+    }): Promise<ApiResponse<UserProfileResponse>> {
+        return this.request<UserProfileResponse>('/users/me/profile/extended', {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+        });
+    }
+
+    // Trust & Verification Methods
+    async addVerification(type: string, metadata?: any): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify', {
+            method: 'POST',
+            body: JSON.stringify({ type, metadata }),
+        });
+    }
+
+    async refreshProfileStats(): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/stats/refresh', {
+            method: 'POST',
+        });
+    }
+
+    // Badge Methods
+    async getUserBadges(userId: string): Promise<ApiResponse<Badge[]>> {
+        return this.request<Badge[]>(`/users/${userId}/badges`);
+    }
+
+    // User Stats Methods
+    async getUserStats(userId: string): Promise<ApiResponse<UserStatsResponse>> {
+        return this.request<UserStatsResponse>(`/users/${userId}/stats`);
+    }
+
+    // Smart Filtering Methods
     async getSpotsFiltered(filters: {
-        transportModes?: string[];
+        transportModes?: TransportMode[];
+        userId?: string;
         latitude?: number;
         longitude?: number;
         radius?: number;
         limit?: number;
         offset?: number;
-        spotType?: string;
+        spot_type?: string;
         minRating?: number;
-        safetyPriority?: string;
-    } = {}) {
-        // Create stable cache key
-        const locationKey = filters.latitude && filters.longitude
-            ? `${filters.latitude.toFixed(3)},${filters.longitude.toFixed(3)},${filters.radius || 10}`
-            : 'no-location';
-
-        const cacheKey = `spots:filtered:${JSON.stringify({
-            modes: filters.transportModes?.sort(),
-            location: locationKey,
-            spotType: filters.spotType,
-            minRating: filters.minRating,
-            safety: filters.safetyPriority,
-            limit: filters.limit || 50,
-            offset: filters.offset || 0
-        })}`;
-
-        const params = new URLSearchParams();
+        safetyPriority?: 'high' | 'medium' | 'low';
+        personalized?: boolean;
+    }): Promise<ApiResponse<SpotResponse[]>> {
+        const searchParams = new URLSearchParams();
 
         if (filters.transportModes?.length) {
-            params.append('transport_modes', filters.transportModes.join(','));
+            searchParams.append('transport_modes', filters.transportModes.join(','));
         }
-        if (filters.latitude) params.append('latitude', filters.latitude.toString());
-        if (filters.longitude) params.append('longitude', filters.longitude.toString());
-        if (filters.radius) params.append('radius', filters.radius.toString());
-        if (filters.limit) params.append('limit', filters.limit.toString());
-        if (filters.offset) params.append('offset', filters.offset.toString());
-        if (filters.spotType) params.append('spot_type', filters.spotType);
-        if (filters.minRating) params.append('min_rating', filters.minRating.toString());
-        if (filters.safetyPriority) params.append('safety_priority', filters.safetyPriority);
+        if (filters.latitude) searchParams.append('latitude', filters.latitude.toString());
+        if (filters.longitude) searchParams.append('longitude', filters.longitude.toString());
+        if (filters.radius) searchParams.append('radius', filters.radius.toString());
+        if (filters.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters.offset) searchParams.append('offset', filters.offset.toString());
+        if (filters.spot_type) searchParams.append('spot_type', filters.spot_type.toString());
+        if (filters.minRating) searchParams.append('min_rating', filters.minRating.toString());
+        if (filters.safetyPriority) searchParams.append('safety_priority', filters.safetyPriority);
 
-        return this.request<any[]>(`/spots/filtered?${params}`, {
-            method: 'GET',
-        }, {
-            useCache: true,
-            ttl: filters.latitude ? 2 * 60 * 1000 : 5 * 60 * 1000,
-            cacheKey
-        });
+        const queryString = searchParams.toString();
+        return this.request<SpotResponse[]>(`/spots/filtered${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getSpotReviews(spotId: string, filters: {
-        transport_mode?: string;
+    async getSpotsByTransportModeQuality(
+        mode: TransportMode,
+        filters?: {
+            latitude?: number;
+            longitude?: number;
+            radius?: number;
+            minEffectiveness?: number;
+            limit?: number;
+            offset?: number;
+        }
+    ): Promise<ApiResponse<SpotResponse[]>> {
+        const searchParams = new URLSearchParams();
+
+        if (filters?.latitude) searchParams.append('latitude', filters.latitude.toString());
+        if (filters?.longitude) searchParams.append('longitude', filters.longitude.toString());
+        if (filters?.radius) searchParams.append('radius', filters.radius.toString());
+        if (filters?.minEffectiveness) searchParams.append('min_effectiveness', filters.minEffectiveness.toString());
+        if (filters?.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters?.offset) searchParams.append('offset', filters.offset.toString());
+
+        const queryString = searchParams.toString();
+        return this.request<SpotResponse[]>(`/spots/for-mode/${mode}${queryString ? `?${queryString}` : ''}`);
+    }
+
+    // Standard Spot Methods
+    async getSpots(filters?: {
         limit?: number;
         offset?: number;
-        sort_by?: 'newest' | 'oldest' | 'most_helpful';
-    } = {}) {
-        const params = new URLSearchParams();
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined) params.append(key, value.toString());
+        spot_type?: string;
+        is_verified?: boolean;
+        min_rating?: number;
+    }): Promise<PaginatedResponse<SpotResponse>> {
+        const searchParams = new URLSearchParams();
+
+        if (filters?.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters?.offset) searchParams.append('offset', filters.offset.toString());
+        if (filters?.spot_type) searchParams.append('spot_type', filters.spot_type);
+        if (filters?.is_verified !== undefined) searchParams.append('is_verified', filters.is_verified.toString());
+        if (filters?.min_rating) searchParams.append('min_rating', filters.min_rating.toString());
+
+        const queryString = searchParams.toString();
+        return this.request<SpotResponse[]>(`/spots${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getSpotById(id: string): Promise<ApiResponse<SpotResponse>> {
+        return this.request<SpotResponse>(`/spots/${id}`);
+    }
+
+    async getNearbySpots(
+        latitude: number,
+        longitude: number,
+        radius: number = 10,
+        limit: number = 20
+    ): Promise<ApiResponse<SpotResponse[]>> {
+        const searchParams = new URLSearchParams({
+            latitude: latitude.toString(),
+            longitude: longitude.toString(),
+            radius: radius.toString(),
+            limit: limit.toString(),
         });
 
-        return this.request<any[]>(`/spots/${spotId}/reviews?${params}`);
+        return this.request<SpotResponse[]>(`/spots/nearby?${searchParams}`);
     }
 
-    async getSpotReviewSummary(spotId: string) {
-        return this.request<any>(`/spots/${spotId}/reviews/summary`);
-    }
-
-
-
-
-    async getNearbySpots(latitude: number, longitude: number, radius = 10, limit = 20) {
-        return this.request<any[]>(
-            `/spots/nearby?latitude=${latitude}&longitude=${longitude}&radius=${radius}&limit=${limit}`
-        );
-    }
-
-    async getSpotById(id: string) {
-        return this.request<any>(`/spots/${id}`);
-    }
-
-    async createSpot(spotData: {
-        name: string;
-        description: string;
-        latitude: number;
-        longitude: number;
-        spot_type: string;
-        tips?: string;
-        accessibility_info?: string;
-        facilities?: string[];
-    }) {
-        return this.request<any>('/spots', {
+    async createSpot(spotData: CreateSpotRequest): Promise<ApiResponse<SpotResponse>> {
+        return this.request<SpotResponse>('/spots', {
             method: 'POST',
             body: JSON.stringify(spotData),
         });
     }
 
-    async updateSpot(id: string, spotData: {
-        name?: string;
-        description?: string;
-        tips?: string;
-        accessibility_info?: string;
-        facilities?: string[];
-    }) {
-        return this.request<any>(`/spots/${id}`, {
+    async updateSpot(id: string, updates: Partial<CreateSpotRequest>): Promise<ApiResponse<SpotResponse>> {
+        return this.request<SpotResponse>(`/spots/${id}`, {
             method: 'PUT',
-            body: JSON.stringify(spotData),
+            body: JSON.stringify(updates),
         });
     }
 
-    async deleteSpot(id: string) {
-        return this.request<any>(`/spots/${id}`, {
+    async deleteSpot(id: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/spots/${id}`, {
             method: 'DELETE',
         });
     }
 
-    async addSpotReview(spotId: string, reviewData: {
-        transport_mode: string;
-        safety_rating: number;
-        effectiveness_rating: number;
-        overall_rating: number;
-        comment?: string;
-        wait_time_minutes?: number;
-        legal_status?: number;
-        facility_rating?: number;
-        accessibility_rating?: number;
-        review_latitude?: number;
-        review_longitude?: number;
-        photos?: string[];
-        context?: string;
-    }) {
-        return this.request<any>(`/spots/${spotId}/reviews`, {
+    // Spot Review Methods
+    async addSpotReview(spotId: string, reviewData: SpotReviewRequest): Promise<ApiResponse<SpotReviewResponse>> {
+        return this.request<SpotReviewResponse>(`/spots/${spotId}/reviews`, {
             method: 'POST',
             body: JSON.stringify(reviewData),
         });
     }
 
-    // Trips Methods
-    async getTrips(filters: {
+    async getSpotReviews(spotId: string, filters?: {
+        transport_mode?: TransportMode;
         limit?: number;
         offset?: number;
-        status?: string;
-        is_public?: boolean;
-        user_id?: string;
-    } = {}) {
-        const params = new URLSearchParams();
-        Object.entries(filters).forEach(([key, value]) => {
-            if (value !== undefined) params.append(key, value.toString());
-        });
+        sort_by?: 'newest' | 'oldest' | 'most_helpful';
+    }): Promise<ApiResponse<SpotReviewResponse[]>> {
+        const searchParams = new URLSearchParams();
 
-        return this.request<any[]>(`/trips?${params}`);
+        if (filters?.transport_mode) searchParams.append('transport_mode', filters.transport_mode);
+        if (filters?.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters?.offset) searchParams.append('offset', filters.offset.toString());
+        if (filters?.sort_by) searchParams.append('sort_by', filters.sort_by);
+
+        const queryString = searchParams.toString();
+        return this.request<SpotReviewResponse[]>(`/spots/${spotId}/reviews${queryString ? `?${queryString}` : ''}`);
     }
 
-    async getTripById(id: string) {
-        return this.request<any>(`/trips/${id}`);
+    async getSpotReviewSummary(spotId: string): Promise<ApiResponse<{
+        total_reviews: number;
+        overall_safety_rating: number;
+        overall_rating: number;
+        last_reviewed?: string;
+        mode_ratings: any;
+        transport_modes_available: TransportMode[];
+    }>> {
+        return this.request(`/spots/${spotId}/reviews/summary`);
     }
 
-    async createTrip(tripData: {
-        title: string;
-        description?: string;
-        start_address: string;
-        end_address: string;
-        start_latitude: number;
-        start_longitude: number;
-        end_latitude: number;
-        end_longitude: number;
-        planned_start_date?: string;
-        estimated_distance?: number;
-        travel_modes?: string[];
-        tags?: string[];
-    }) {
-        return this.request<any>('/trips', {
-            method: 'POST',
-            body: JSON.stringify(tripData),
-        });
-    }
-
-    async updateTrip(id: string, tripData: any) {
-        return this.request<any>(`/trips/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify(tripData),
-        });
-    }
-
-    async addSpotToTrip(tripId: string, spotId: string, orderIndex?: number) {
-        return this.request<any>(`/trips/${tripId}/spots`, {
-            method: 'POST',
-            body: JSON.stringify({ spot_id: spotId, order_index: orderIndex }),
-        });
-    }
-    async getUserProfile(userId: string) {
-        if (__DEV__) {
-            console.log('🔧 DEV: Returning mock profile response');
-            // Return mock "not found" to trigger profile creation flow
-            throw new Error('Profile not found - onboarding needed');
-        }
-        return this.request<any>(`/users/me/profile`);
-    }
-
-
-    async updateUserProfile(userId: string, profileData: any) {
-        if (__DEV__) {
-            console.log('🔧 DEV: Mock profile update success');
+    // User Filter Preferences (for smart filtering)
+    async getUserFilterPreferences(userId: string): Promise<{
+        travelModes: TransportMode[];
+        showAllSpots: boolean;
+        safetyPriority: 'high' | 'medium' | 'low';
+        experienceLevel: 'beginner' | 'intermediate' | 'expert';
+    }> {
+        try {
+            const response = await this.getUserProfile(userId);
             return {
-                data: {
-                    userId: userId,
-                    travelModes: profileData.travelModes,
-                    preferences: {
-                        primaryMode: profileData.primaryMode,
-                        showAllSpots: profileData.showAllSpots,
-                        experienceLevel: profileData.experienceLevel,
-                        safetyPriority: profileData.safetyPriority,
-                    },
-                    onboardingCompleted: profileData.onboardingCompleted,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                }
+                travelModes: response.data.travelModes,
+                showAllSpots: response.data.showAllSpots,
+                safetyPriority: response.data.safetyPriority,
+                experienceLevel: response.data.experienceLevel,
+            };
+        } catch (error) {
+            // Return defaults if profile not found
+            return {
+                travelModes: [TransportMode.HITCHHIKING],
+                showAllSpots: false,
+                safetyPriority: 'high',
+                experienceLevel: 'beginner',
             };
         }
-        return this.request<any>(`/users/me/profile`, {
-            method: 'PUT',
-            body: JSON.stringify(profileData),
+    }
+
+    async addTrustVerification(type: string, metadata?: any): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify', {
+            method: 'POST',
+            body: JSON.stringify({ type, metadata }),
         });
     }
 
-    async createUserProfile(userId: string, profileData: any) {
-        if (__DEV__) {
-            console.log('🔧 DEV: Mock profile creation success');
-            return this.updateUserProfile(userId, profileData); // Same mock response
-        }
-        return this.request<any>(`/users/me/profile`, {
-            method: 'POST',
-            body: JSON.stringify(profileData),
+    async getUserVerifications(userId: string): Promise<ApiResponse<TrustVerificationResponse[]>> {
+        return this.request<TrustVerificationResponse[]>(`/users/${userId}/verifications`);
+    }
+
+    async getMyVerifications(): Promise<ApiResponse<TrustVerificationResponse[]>> {
+        return this.request<TrustVerificationResponse[]>('/users/me/verifications');
+    }
+
+    async removeVerification(verificationId: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/users/me/verifications/${verificationId}`, {
+            method: 'DELETE',
         });
     }
+
+    // Email verification flow
+    async requestEmailVerification(): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify/email/request', {
+            method: 'POST',
+        });
+    }
+
+    async verifyEmail(token: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify/email/confirm', {
+            method: 'POST',
+            body: JSON.stringify({ token }),
+        });
+    }
+
+    // Phone verification flow
+    async requestPhoneVerification(phoneNumber: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify/phone/request', {
+            method: 'POST',
+            body: JSON.stringify({ phoneNumber }),
+        });
+    }
+
+    async verifyPhone(phoneNumber: string, code: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify/phone/confirm', {
+            method: 'POST',
+            body: JSON.stringify({ phoneNumber, code }),
+        });
+    }
+
+    // Social verification
+    async verifySocialAccount(platform: 'facebook' | 'google', accessToken: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request('/users/me/verify/social', {
+            method: 'POST',
+            body: JSON.stringify({ platform, accessToken }),
+        });
+    }
+
+    // Community vouch
+    async vouchForUser(userId: string, message?: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/users/${userId}/vouch`, {
+            method: 'POST',
+            body: JSON.stringify({ message }),
+        });
+    }
+
+    // Health Check
+    async healthCheck(): Promise<ApiResponse<any>> {
+        return this.request('/health');
+    }
+
+
+
+
 }
 
+// Export singleton instance
+export const apiClient = new ApiClient(
+    process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
+);
 
-export const apiClient = new ApiClient(API_BASE_URL);
+// For development debugging
+if (__DEV__) {
+    // @ts-ignore
+    global.apiClient = apiClient;
+    console.log('🔧 ApiClient available globally as window.apiClient for debugging');
+}
+
+export type {
+    ApiResponse,
+    PaginatedResponse,
+    UserProfileResponse,
+    CompleteUserProfileResponse,
+    Badge,
+    BadgeCounts,
+    UserStatsResponse,
+    SpotResponse,
+    SpotReviewResponse,
+    CreateSpotRequest,
+    SpotReviewRequest,
+};

@@ -1,22 +1,44 @@
 // app/types/profile.ts - Update with mode filtering
 import { TransportMode } from './transport';
+import {Badge, BadgeCounts} from "@/app/services/api";
 
-export interface TravelProfile {
+interface TravelProfile {
     userId: string;
-
-    // What modes the user is interested in
-    selectedModes: TransportMode[];
-    primaryMode: TransportMode; // Their main travel method
-
-    // Settings
-    showAllSpots: boolean; // Override to see everything
+    travelModes: TransportMode[];  // Use this consistently
+    primaryMode: TransportMode;
     experienceLevel: 'beginner' | 'intermediate' | 'expert';
     safetyPriority: 'high' | 'medium' | 'low';
+    showAllSpots: boolean;
 
-    // Meta
+    // Phase 1: Trust & Credibility
+    trustScore: number;
+    emailVerified: boolean;
+    phoneVerified: boolean;
+    socialConnected: boolean;
+    communityVouches: number;
+    totalReviews: number;
+    helpfulReviews: number;
+    reviewerRating: number;
+    spotsAdded: number;
+    verifiedSpots: number;
+
+    // Phase 2: Extended Profile
+    bio?: string;
+    languages: string[];
+    countriesVisited: string[];
+    publicProfile: boolean;
+    showStats: boolean;
+
+    // Badges
+    badges: Badge[];
+    badgeCounts: BadgeCounts;
+
+    // Metadata
     onboardingCompleted: boolean;
     createdAt: Date;
     updatedAt: Date;
+    memberSince: Date;
+    isNewMember: boolean;
 }
 
 export interface UserStats {
