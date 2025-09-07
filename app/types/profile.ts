@@ -1,10 +1,35 @@
-// app/types/profile.ts - Update with mode filtering
+// app/types/profile.ts - ADD MISSING BADGE TYPES
 import { TransportMode } from './transport';
-import {Badge, BadgeCounts} from "@/app/services/api";
 
-interface TravelProfile {
+// Add the Badge interface
+export interface Badge {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    emoji: string;
+    category: string;
+    level?: string;
+    earnedAt: string;
+}
+
+// Add the BadgeCounts interface
+export interface BadgeCounts {
+    total: number;
+    trust: number;
+    reviewer: number;
+    contributor: number;
+    explorer: number;
+    community: number;
+    special: number;
+    gold: number;
+    silver: number;
+    bronze: number;
+}
+
+export interface TravelProfile {
     userId: string;
-    travelModes: TransportMode[];  // Use this consistently
+    travelModes: TransportMode[];
     primaryMode: TransportMode;
     experienceLevel: 'beginner' | 'intermediate' | 'expert';
     safetyPriority: 'high' | 'medium' | 'low';
@@ -23,7 +48,7 @@ interface TravelProfile {
     verifiedSpots: number;
 
     // Phase 2: Extended Profile
-    bio?: string;
+    bio: string;
     languages: string[];
     countriesVisited: string[];
     publicProfile: boolean;
@@ -42,7 +67,11 @@ interface TravelProfile {
 }
 
 export interface UserStats {
-    // Keep existing stats structure
+    totalTrips: number;
+    totalDistance: number;
+    countriesVisited: number;
+    carbonSaved: number;
+
     hitchhiking?: {
         totalRides: number;
         totalDistance: number;

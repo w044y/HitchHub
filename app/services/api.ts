@@ -1,5 +1,6 @@
 // app/services/api.ts - Complete API Client with ProfileContext support
 import { TransportMode } from '@/app/types/transport';
+import * as SecureStore from 'expo-secure-store';
 
 // API Response Types
 interface ApiResponse<T = any> {
@@ -216,18 +217,58 @@ class ApiClient {
     private baseURL: string;
     private token: string | null = null;
 
-    constructor(baseURL: string = 'http://localhost:3000/api/v1') {
-        this.baseURL = baseURL;
+    constructor(baseURL?: string) {
+        if (baseURL) {
+            this.baseURL = baseURL;
+        } else if (__DEV__) {
+            // Development URL logic
+            this.baseURL = 'http://192.XXX:3000/api/v1' // Android emulator default
+            // Alternative: Use your computer's IP
+            // this.baseURL = 'http://192.168.1.XXX:3000/api/v1'; // Replace XXX with your IP
+        } else {
+            // Production URL
+            this.baseURL = 'https://your-production-api.com/api/v1';
+        }
 
         if (__DEV__) {
             console.log('🔧 ApiClient initialized with base URL:', this.baseURL);
         }
+
+        this.initializeToken();
     }
 
-    setToken(token: string | null) {
+    private async initializeToken() {
+        try {
+            const storedToken = await SecureStore.getItemAsync('auth_token');
+            if (storedToken) {
+                this.token = storedToken;
+                if (__DEV__) {
+                    console.log('🔑 Restored token from secure storage');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to restore token:', error);
+        }
+    }
+
+
+    async setToken(token: string | null) {
         this.token = token;
-        if (__DEV__) {
-            console.log('🔑 API token set:', token ? 'Token available' : 'No token');
+
+        try {
+            if (token) {
+                await SecureStore.setItemAsync('auth_token', token);
+                if (__DEV__) {
+                    console.log('🔑 Token saved to secure storage');
+                }
+            } else {
+                await SecureStore.deleteItemAsync('auth_token');
+                if (__DEV__) {
+                    console.log('🗑️ Token removed from secure storage');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to manage token storage:', error);
         }
     }
 
@@ -243,31 +284,65 @@ class ApiClient {
         return headers;
     }
 
-    private async request<T = any>(
-        endpoint: string,
-        options: RequestInit = {}
-    ): Promise<ApiResponse<T>> {
+    private async request<T>(endpoint: string, config: RequestInit = {}): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
 
-        const config: RequestInit = {
-            ...options,
-            headers: {
-                ...this.getHeaders(),
-                ...options.headers,
-            },
+        // FIX: Create headers as a proper Record type
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        // Add any existing headers
+        if (config.headers) {
+            if (config.headers instanceof Headers) {
+                // Handle Headers object
+                config.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+            } else if (Array.isArray(config.headers)) {
+                // Handle array format
+                config.headers.forEach(([key, value]) => {
+                    headers[key] = value;
+                });
+            } else {
+                // Handle object format
+                Object.assign(headers, config.headers);
+            }
+        }
+
+        // Add authorization header if token exists
+        if (this.token) {
+            headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        const finalConfig: RequestInit = {
+            ...config,
+            headers,
         };
 
         if (__DEV__) {
-            console.log(`🌐 API ${config.method || 'GET'} ${url}`,
-                config.body ? JSON.parse(config.body as string) : '');
+            console.log(`📡 API Request ${config.method || 'GET'} ${url}`);
+            if (config.body) {
+                console.log('📦 Request body:', JSON.parse(config.body as string));
+            }
+            if (this.token) {
+                console.log('🔑 Request includes auth token');
+            }
         }
 
         try {
-            const response = await fetch(url, config);
+            const response = await fetch(url, finalConfig);
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error?.message || `HTTP ${response.status}: ${response.statusText}`);
+                // Handle token expiry
+                if (response.status === 401 && this.token) {
+                    console.log('🔄 Token expired, clearing stored token');
+                    await this.setToken(null);
+                    throw new Error('UNAUTHORIZED');
+                }
+
+                throw new Error(data.error?.message || data.message || `HTTP ${response.status}: ${response.statusText}`);
             }
 
             if (__DEV__) {
@@ -281,6 +356,38 @@ class ApiClient {
         }
     }
 
+    loginAsDev = async (email: string = 'dev@vendro.app'): Promise<ApiResponse<AuthResponse>> => {
+        if (!__DEV__) {
+            throw new Error('Dev login only available in development');
+        }
+
+        try {
+            console.log('🔧 Starting dev authentication for:', email);
+
+            // Try the dedicated dev login endpoint first
+            try {
+                const result = await this.request<AuthResponse>('/auth/dev-login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email }),
+                });
+
+                console.log('✅ Dev login successful via /auth/dev-login');
+                return result;
+            } catch (error) {
+                console.log('⚠️ Dev login endpoint failed, trying magic link flow...');
+
+                // Fallback to magic link flow
+                await this.sendMagicLink(email);
+                const result = await this.verifyMagicLink('dev-token-12345', email);
+                console.log('✅ Dev login successful via magic link flow');
+                return result;
+            }
+        } catch (error) {
+            console.error('❌ All dev authentication methods failed:', error);
+            throw error;
+        }
+    };
+
     // Auth Methods
     async sendMagicLink(email: string): Promise<ApiResponse<MagicLinkResponse>> {
         return this.request<MagicLinkResponse>('/auth/magic-link', {
@@ -290,15 +397,38 @@ class ApiClient {
     }
 
     async verifyMagicLink(token: string, email: string): Promise<ApiResponse<AuthResponse>> {
-        return this.request<AuthResponse>('/auth/verify', {
+        const result = await this.request<AuthResponse>('/auth/verify', {
             method: 'POST',
             body: JSON.stringify({ token, email }),
         });
+
+        // Auto-save the token
+        if (result.data.accessToken) {
+            await this.setToken(result.data.accessToken);
+        }
+
+        return result;
     }
 
     async getCurrentUser(): Promise<ApiResponse<any>> {
         return this.request('/auth/me');
     }
+
+    async refreshToken(): Promise<ApiResponse<AuthResponse>> {
+        const result = await this.request<AuthResponse>('/auth/refresh', {
+            method: 'POST',
+        });
+
+        if (result.data.accessToken) {
+            await this.setToken(result.data.accessToken);
+        }
+
+        return result;
+    }
+
+
+    // Development helper
+
 
     async logout(): Promise<ApiResponse<{ message: string }>> {
         return this.request('/auth/logout', {
@@ -632,9 +762,7 @@ class ApiClient {
 }
 
 // Export singleton instance
-export const apiClient = new ApiClient(
-    process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1'
-);
+export const apiClient = new ApiClient();
 
 // For development debugging
 if (__DEV__) {

@@ -1,4 +1,4 @@
-// app/auth/login.tsx
+// app/(auth)/login.tsx - CLEAN LOGIN SCREEN
 import React, { useState } from 'react';
 import {
     View,
@@ -6,120 +6,155 @@ import {
     TextInput,
     TouchableOpacity,
     StyleSheet,
+    KeyboardAvoidingView,
+    Platform,
     Alert,
-    ActivityIndicator
 } from 'react-native';
+import { useAuth } from '@/app/contexts/AuthContext';
 import { router } from 'expo-router';
-import { useAuth } from '../contexts/AuthContext';
-import { Colors } from '../../constants/Colors';
-import { useColorScheme } from '../../components/useColorScheme';
 
 export default function LoginScreen() {
-    const [email, setEmail] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const { sendMagicLink } = useAuth();
-    const colorScheme = useColorScheme();
-    const colors = Colors[colorScheme ?? 'light'];
+    const { sendMagicLink, verifyMagicLink, isLoading, loginAsDev } = useAuth();
+    const [email, setEmail] = useState(__DEV__ ? 'dev@vendro.app' : '');
+    const [token, setToken] = useState('');
+    const [step, setStep] = useState<'email' | 'token'>('email');
 
     const handleSendMagicLink = async () => {
         if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email address');
+            Alert.alert('Error', 'Please enter your email');
             return;
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            Alert.alert('Error', 'Please enter a valid email address');
-            return;
-        }
-
-        setIsLoading(true);
         try {
-            await sendMagicLink(email.toLowerCase().trim());
-
-            Alert.alert(
-                'Magic Link Sent! ✨',
-                'Check your email for the login link. It will expire in 15 minutes.',
-                [
-                    {
-                        text: 'OK',
-                        onPress: () => router.replace({
-                            pathname: "/auth/verify",
-                            params: { email: email.toLowerCase().trim() }
-                        })
-                    }
-                ]
-            );
+            await sendMagicLink(email.trim());
+            setStep('token');
         } catch (error) {
-            Alert.alert('Error', `Failed to send magic link: ${error}`);
-        } finally {
-            setIsLoading(false);
+            // Error already handled in context
+        }
+    };
+
+    const handleVerifyToken = async () => {
+        if (!token.trim()) {
+            Alert.alert('Error', 'Please enter the token from your email');
+            return;
+        }
+
+        try {
+            await verifyMagicLink(token.trim(), email.trim());
+            router.replace('../(tabs)');
+        } catch (error) {
+            // Error already handled in context
+        }
+    };
+
+    const handleDevLogin = async () => {
+        if (!__DEV__ || !loginAsDev) return;
+
+        try {
+            await loginAsDev();
+            router.replace('../(tabs)');
+        } catch (error) {
+            // Error already handled in context
         }
     };
 
     return (
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
             <View style={styles.content}>
-                <Text style={styles.emoji}>🏕️</Text>
-                <Text style={[styles.title, { color: colors.text }]}>Welcome to Vendro</Text>
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-                    Enter your email to get started with sustainable travel
+                <Text style={styles.title}>Welcome to HitchHub</Text>
+                <Text style={styles.subtitle}>
+                    {step === 'email'
+                        ? 'Enter your email to get started'
+                        : 'Enter the token from your email'
+                    }
                 </Text>
 
-                <View style={styles.form}>
-                    <TextInput
-                        style={[styles.input, {
-                            backgroundColor: colors.backgroundSecondary,
-                            color: colors.text,
-                            borderColor: colors.border
-                        }]}
-                        placeholder="Enter your email address"
-                        placeholderTextColor={colors.textSecondary}
-                        value={email}
-                        onChangeText={setEmail}
-                        keyboardType="email-address"
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                        editable={!isLoading}
-                    />
+                {step === 'email' ? (
+                    <>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Email address"
+                            value={email}
+                            onChangeText={setEmail}
+                            keyboardType="email-address"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
 
-                    <TouchableOpacity
-                        style={[styles.button, { backgroundColor: colors.primary }]}
-                        onPress={handleSendMagicLink}
-                        disabled={isLoading}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="white" />
-                        ) : (
-                            <Text style={styles.buttonText}>✨ Send Magic Link</Text>
+                        <TouchableOpacity
+                            style={[styles.button, isLoading && styles.buttonDisabled]}
+                            onPress={handleSendMagicLink}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.buttonText}>
+                                {isLoading ? 'Sending...' : 'Send Magic Link'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {__DEV__ && (
+                            <TouchableOpacity
+                                style={[styles.button, styles.devButton]}
+                                onPress={handleDevLogin}
+                                disabled={isLoading}
+                            >
+                                <Text style={styles.buttonText}>
+                                    🔧 Dev Login
+                                </Text>
+                            </TouchableOpacity>
                         )}
-                    </TouchableOpacity>
-                </View>
+                    </>
+                ) : (
+                    <>
+                        <TextInput
+                            style={styles.input}
+                            placeholder="Enter token from email"
+                            value={token}
+                            onChangeText={setToken}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                        />
 
-                <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
-                    We'll send you a secure login link. No passwords required! 🔐
-                </Text>
+                        <TouchableOpacity
+                            style={[styles.button, isLoading && styles.buttonDisabled]}
+                            onPress={handleVerifyToken}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.buttonText}>
+                                {isLoading ? 'Verifying...' : 'Sign In'}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.backButton}
+                            onPress={() => setStep('email')}
+                        >
+                            <Text style={styles.backButtonText}>
+                                ← Back to email
+                            </Text>
+                        </TouchableOpacity>
+                    </>
+                )}
             </View>
-        </View>
+        </KeyboardAvoidingView>
     );
 }
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#fff',
     },
     content: {
         flex: 1,
         justifyContent: 'center',
-        paddingHorizontal: 32,
-    },
-    emoji: {
-        fontSize: 64,
-        textAlign: 'center',
-        marginBottom: 24,
+        paddingHorizontal: 24,
+        gap: 16,
     },
     title: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 8,
@@ -127,33 +162,40 @@ const styles = StyleSheet.create({
     subtitle: {
         fontSize: 16,
         textAlign: 'center',
-        marginBottom: 48,
-        lineHeight: 24,
-    },
-    form: {
+        color: '#666',
         marginBottom: 32,
     },
     input: {
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        padding: 16,
         fontSize: 16,
-        marginBottom: 20,
     },
     button: {
-        borderRadius: 12,
-        paddingVertical: 16,
+        backgroundColor: '#007AFF',
+        padding: 16,
+        borderRadius: 8,
         alignItems: 'center',
     },
+    buttonDisabled: {
+        opacity: 0.6,
+    },
     buttonText: {
-        color: 'white',
+        color: '#fff',
         fontSize: 16,
         fontWeight: '600',
     },
-    disclaimer: {
-        fontSize: 14,
-        textAlign: 'center',
-        lineHeight: 20,
+    devButton: {
+        backgroundColor: '#FF6B35',
+        marginTop: 8,
+    },
+    backButton: {
+        padding: 16,
+        alignItems: 'center',
+    },
+    backButtonText: {
+        color: '#007AFF',
+        fontSize: 16,
     },
 });

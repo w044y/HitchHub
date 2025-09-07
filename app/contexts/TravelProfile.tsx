@@ -1,11 +1,9 @@
-// app/contexts/ProfileContext.tsx - USE LOCAL TYPES
+// app/contexts/ProfileContext.tsx - CORRECTED VERSION
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { TravelProfile, UserStats, Badge, BadgeCounts } from '../types/profile';
+import { TravelProfile, UserStats } from '../types/profile';
 import { TransportMode } from '@/app/types/transport';
 import { useAuth } from './AuthContext';
-import { apiClient } from '@/app/services/api';
-
-// Remove the import of Badge and BadgeCounts from api client since we're defining them locally
+import { apiClient, type Badge, type BadgeCounts } from '@/app/services/api';
 
 interface ProfileContextType {
     profile: TravelProfile | null;
@@ -35,6 +33,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
             authLoading
         });
 
+        // Don't start profile loading until auth is completely done
         if (authLoading) {
             console.log('📝 Waiting for auth to complete...');
             return;
@@ -59,11 +58,13 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
         try {
             console.log('🔄 Fetching real profile from API...');
 
+            // Try to get the user's actual profile from the API
             const profileResult = await apiClient.getCurrentUser();
 
             if (profileResult.data && profileResult.data.profile) {
                 console.log('✅ Real profile loaded from API');
 
+                // Convert API response to TravelProfile format
                 const apiProfile = profileResult.data.profile;
                 const convertedProfile: TravelProfile = {
                     userId: user?.id || '',
@@ -76,7 +77,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                     showAllSpots: apiProfile.show_all_spots || false,
 
                     // Trust & verification from API
-                    trustScore: 65,
+                    trustScore: 65, // Calculate this properly later
                     emailVerified: apiProfile.email_verified || false,
                     phoneVerified: apiProfile.phone_verified || false,
                     socialConnected: apiProfile.social_connected || false,
@@ -96,7 +97,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                     publicProfile: apiProfile.public_profile !== false,
                     showStats: apiProfile.show_stats !== false,
 
-                    // Badges (empty for now)
+                    // Badges (empty for now, add later)
                     badges: [],
                     badgeCounts: {
                         total: 0,
@@ -120,8 +121,12 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                 };
 
                 setProfile(convertedProfile);
-                console.log('✅ Profile set - onboarding completed:', convertedProfile.onboardingCompleted);
+                console.log('✅ Profile converted and set:', {
+                    onboardingCompleted: convertedProfile.onboardingCompleted,
+                    travelModes: convertedProfile.travelModes
+                });
 
+                // Load mock stats for now
                 setStats({
                     totalTrips: 0,
                     totalDistance: 0,
@@ -136,8 +141,14 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         } catch (error: any) {
             console.error('❌ Failed to load real profile:', error.message);
-            console.log('🔄 Creating default profile due to API error');
-            createDefaultProfile();
+
+            if (error.message === 'UNAUTHORIZED') {
+                setError('Authentication required');
+            } else {
+                // Fallback to creating a default profile
+                console.log('🔄 Creating default profile due to API error');
+                createDefaultProfile();
+            }
         } finally {
             setIsLoading(false);
         }
@@ -148,26 +159,36 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const defaultProfile: TravelProfile = {
             userId: user?.id || 'unknown',
+
+            // Travel preferences
             travelModes: [TransportMode.HITCHHIKING],
             primaryMode: TransportMode.HITCHHIKING,
             experienceLevel: 'beginner',
             safetyPriority: 'high',
             showAllSpots: false,
+
+            // Trust & verification
             trustScore: 50,
             emailVerified: user?.is_verified || false,
             phoneVerified: false,
             socialConnected: false,
             communityVouches: 0,
+
+            // Stats
             totalReviews: 0,
             helpfulReviews: 0,
             reviewerRating: 0,
             spotsAdded: 0,
             verifiedSpots: 0,
+
+            // Extended profile
             bio: '',
             languages: ['en'],
             countriesVisited: [],
             publicProfile: true,
             showStats: true,
+
+            // Badges
             badges: [],
             badgeCounts: {
                 total: 0,
@@ -181,7 +202,9 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
                 silver: 0,
                 bronze: 0,
             },
-            onboardingCompleted: false, // Key: start with incomplete onboarding
+
+            // Meta - IMPORTANT: Set onboarding as incomplete for new users
+            onboardingCompleted: false,
             createdAt: new Date(),
             updatedAt: new Date(),
             memberSince: new Date(user?.created_at || Date.now()),
@@ -196,7 +219,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
             carbonSaved: 0
         });
 
-        console.log('✅ Default profile created - onboarding incomplete');
+        console.log('✅ Default profile created with onboarding incomplete');
     };
 
     const updateProfile = async (updates: Partial<TravelProfile>) => {
@@ -204,6 +227,7 @@ export const ProfileProvider: React.FC<{ children: ReactNode }> = ({ children })
 
         const updatedProfile = { ...profile, ...updates, updatedAt: new Date() };
         setProfile(updatedProfile);
+
         console.log('✅ Profile updated locally');
     };
 
