@@ -103,7 +103,7 @@ export default function HomeScreen() {
                         Your travel modes:
                     </Text>
                     <View style={styles.modesList}>
-                        {profile.selectedModes.map((mode) => (
+                        {profile.travelModes.map((mode) => (
                             <View key={mode} style={[styles.modeTag, { backgroundColor: colors.backgroundSecondary }]}>
                                 <Text style={styles.modeTagText}>
                                     {mode === TransportMode.HITCHHIKING && '👍 Hitchhiking'}
@@ -118,16 +118,16 @@ export default function HomeScreen() {
             </Card>
 
             {/* Conditional Stats Cards based on user's selected modes */}
-            {profile.selectedModes.includes(TransportMode.HITCHHIKING) && stats?.hitchhiking && (
+            {profile.travelModes.includes(TransportMode.HITCHHIKING) && stats?.hitchhiking && (
                 <HitchhikingStatsCard stats={stats.hitchhiking} />
             )}
 
-            {profile.selectedModes.includes(TransportMode.CYCLING) && stats?.cycling && (
+            {profile.travelModes.includes(TransportMode.CYCLING) && stats?.cycling && (
                 <CyclingStatsCard stats={stats.cycling} />
             )}
 
             {/* Smart Quick Actions */}
-            <QuickActionsCard travelModes={profile.selectedModes} />
+            <QuickActionsCard travelModes={profile.travelModes} />
 
             {/* Recent Activity */}
             <Card style={styles.card}>

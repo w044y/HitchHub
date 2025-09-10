@@ -1,6 +1,15 @@
 // app/services/api.ts - Complete API Client with ProfileContext support
 import { TransportMode } from '@/app/types/transport';
 import * as SecureStore from 'expo-secure-store';
+import {
+    CreateTripRequest,
+    DailyUpdate,
+    EnhancedTrip, RealityEntry,
+    Trip, TripPhase, TripPhoto, TripPrivacyLevel,
+    TripSpot,
+    TripSpotStatus,
+    TripStatus
+} from "../types/trip";
 
 // API Response Types
 interface ApiResponse<T = any> {
@@ -212,26 +221,43 @@ interface SpotReviewResponse {
         safety_rating: number;
     };
 }
+// API Response Types
+interface ApiResponse<T = any> {
+    data: T;
+    message?: string;
+    error?: string;
+    statusCode?: number;
+}
+
+interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
+    pagination?: {
+        limit: number;
+        offset: number;
+        total: number;
+    };
+}
+
 
 class ApiClient {
     private baseURL: string;
     private token: string | null = null;
+    private isDevelopment: boolean; // FIX: Add missing property
 
     constructor(baseURL?: string) {
+        this.isDevelopment = __DEV__; // FIX: Initialize development flag
+
         if (baseURL) {
             this.baseURL = baseURL;
-        } else if (__DEV__) {
+        } else if (this.isDevelopment) {
             // Development URL logic
-            this.baseURL = 'http://192.XXX:3000/api/v1' // Android emulator default
-            // Alternative: Use your computer's IP
-            // this.baseURL = 'http://192.168.1.XXX:3000/api/v1'; // Replace XXX with your IP
+            this.baseURL = 'http://xxxx:3000/api/v1';
         } else {
             // Production URL
             this.baseURL = 'https://your-production-api.com/api/v1';
         }
 
-        if (__DEV__) {
-            console.log('🔧 ApiClient initialized with base URL:', this.baseURL);
+        if (this.isDevelopment) {
+            console.log('🔧 ApiClient initialized in DEVELOPMENT mode with base URL:', this.baseURL);
         }
 
         this.initializeToken();
@@ -242,7 +268,7 @@ class ApiClient {
             const storedToken = await SecureStore.getItemAsync('auth_token');
             if (storedToken) {
                 this.token = storedToken;
-                if (__DEV__) {
+                if (this.isDevelopment) {
                     console.log('🔑 Restored token from secure storage');
                 }
             }
@@ -251,19 +277,18 @@ class ApiClient {
         }
     }
 
-
     async setToken(token: string | null) {
         this.token = token;
 
         try {
             if (token) {
                 await SecureStore.setItemAsync('auth_token', token);
-                if (__DEV__) {
+                if (this.isDevelopment) {
                     console.log('🔑 Token saved to secure storage');
                 }
             } else {
                 await SecureStore.deleteItemAsync('auth_token');
-                if (__DEV__) {
+                if (this.isDevelopment) {
                     console.log('🗑️ Token removed from secure storage');
                 }
             }
@@ -277,6 +302,7 @@ class ApiClient {
             'Content-Type': 'application/json',
         };
 
+        // FIX: Always include token if available, regardless of environment
         if (this.token) {
             headers.Authorization = `Bearer ${this.token}`;
         }
@@ -287,32 +313,22 @@ class ApiClient {
     private async request<T>(endpoint: string, config: RequestInit = {}): Promise<ApiResponse<T>> {
         const url = `${this.baseURL}${endpoint}`;
 
-        // FIX: Create headers as a proper Record type
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
+        // FIX: Use getHeaders() method instead of duplicate logic
+        const headers = this.getHeaders();
 
-        // Add any existing headers
+        // Merge with any additional headers from config
         if (config.headers) {
             if (config.headers instanceof Headers) {
-                // Handle Headers object
                 config.headers.forEach((value, key) => {
-                    headers[key] = value;
+                    (headers as Record<string, string>)[key] = value;
                 });
             } else if (Array.isArray(config.headers)) {
-                // Handle array format
                 config.headers.forEach(([key, value]) => {
-                    headers[key] = value;
+                    (headers as Record<string, string>)[key] = value;
                 });
             } else {
-                // Handle object format
                 Object.assign(headers, config.headers);
             }
-        }
-
-        // Add authorization header if token exists
-        if (this.token) {
-            headers['Authorization'] = `Bearer ${this.token}`;
         }
 
         const finalConfig: RequestInit = {
@@ -320,13 +336,15 @@ class ApiClient {
             headers,
         };
 
-        if (__DEV__) {
+        if (this.isDevelopment) {
             console.log(`📡 API Request ${config.method || 'GET'} ${url}`);
             if (config.body) {
                 console.log('📦 Request body:', JSON.parse(config.body as string));
             }
             if (this.token) {
                 console.log('🔑 Request includes auth token');
+            } else {
+                console.log('⚠️ No auth token - API may reject request');
             }
         }
 
@@ -345,7 +363,7 @@ class ApiClient {
                 throw new Error(data.error?.message || data.message || `HTTP ${response.status}: ${response.statusText}`);
             }
 
-            if (__DEV__) {
+            if (this.isDevelopment) {
                 console.log(`✅ API Response ${response.status}:`, data);
             }
 
@@ -356,8 +374,9 @@ class ApiClient {
         }
     }
 
-    loginAsDev = async (email: string = 'dev@vendro.app'): Promise<ApiResponse<AuthResponse>> => {
-        if (!__DEV__) {
+    // FIX: Add development authentication method
+    async loginAsDev(email: string = 'dev@vendro.app'): Promise<ApiResponse<AuthResponse>> {
+        if (!this.isDevelopment) {
             throw new Error('Dev login only available in development');
         }
 
@@ -386,8 +405,255 @@ class ApiClient {
             console.error('❌ All dev authentication methods failed:', error);
             throw error;
         }
-    };
+    }
 
+    // FIX: Override getCurrentUser for development
+    // app/services/api.ts - Use consistent dev user ID
+    async getCurrentUser(): Promise<ApiResponse<any>> {
+        if (this.isDevelopment && !this.token) {
+            console.log('🔧 [DEV] No token available, returning mock user data');
+            return {
+                data: {
+                    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', // FIXED: Match backend
+                    email: 'dev@vendro.app',
+                    username: 'devuser',
+                    display_name: 'Dev User',
+                    vendro_points: 100,
+                    safety_rating: 4.5,
+                    is_verified: true,
+                    created_at: new Date().toISOString(),
+                },
+                message: 'Development mock user data'
+            };
+        }
+
+        return this.request('/auth/me');
+    }
+
+
+
+
+
+
+
+
+    async getTrips(filters?: {
+        limit?: number;
+        offset?: number;
+        status?: TripStatus;
+        is_public?: boolean;
+        user_id?: string;
+    }): Promise<ApiResponse<Trip[]>> {
+        const searchParams = new URLSearchParams();
+
+        if (filters?.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters?.offset) searchParams.append('offset', filters.offset.toString());
+        if (filters?.status) searchParams.append('status', filters.status);
+        if (filters?.is_public !== undefined) searchParams.append('is_public', filters.is_public.toString());
+        if (filters?.user_id) searchParams.append('user_id', filters.user_id);
+
+        const queryString = searchParams.toString();
+        return this.request<Trip[]>(`/trips${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async getTripById(id: string): Promise<ApiResponse<Trip>> {
+        return this.request<Trip>(`/trips/${id}`);
+    }
+
+    async createTrip(tripData: CreateTripRequest): Promise<ApiResponse<Trip>> {
+        return this.request<Trip>('/trips', {
+            method: 'POST',
+            body: JSON.stringify(tripData),
+        });
+    }
+
+    async updateTrip(id: string, updates: Partial<CreateTripRequest & {
+        status?: TripStatus;
+        actual_start_date?: string;
+        actual_end_date?: string;
+        actual_distance?: number;
+        notes?: string;
+    }>): Promise<ApiResponse<Trip>> {
+        return this.request<Trip>(`/trips/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+        });
+    }
+
+    async deleteTrip(id: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/trips/${id}`, {
+            method: 'DELETE',
+        });
+    }
+    async createEnhancedTrip(tripData: {
+        title: string;
+        description?: string;
+        start_address: string;
+        end_address: string;
+        start_latitude: number;
+        start_longitude: number;
+        end_latitude: number;
+        end_longitude: number;
+        travel_modes: string[];
+        intention_notes?: string;
+        user_id: string;
+    }): Promise<ApiResponse<EnhancedTrip>> {
+        return this.request<EnhancedTrip>('/trips', {
+            method: 'POST',
+            body: JSON.stringify(tripData),
+        });
+    }
+
+    async transitionTripPhase(tripId: string, phase: TripPhase): Promise<ApiResponse<EnhancedTrip>> {
+        return this.request<EnhancedTrip>(`/trips/${tripId}/phase`, {
+            method: 'PUT',
+            body: JSON.stringify({ phase }),
+        });
+    }
+
+    async updateTripPrivacy(tripId: string, privacyLevel: TripPrivacyLevel): Promise<ApiResponse<EnhancedTrip>> {
+        return this.request<EnhancedTrip>(`/trips/${tripId}/privacy`, {
+            method: 'PUT',
+            body: JSON.stringify({ privacy_level: privacyLevel }),
+        });
+    }
+
+    async addRealityEntry(tripId: string, realityData: {
+        planned_spot_id?: string;
+        actual_location: {
+            latitude: number;
+            longitude: number;
+            name: string;
+        };
+        experience_rating: 1 | 2 | 3 | 4 | 5;
+        worth_it_rating: 'skip' | 'ok' | 'worth_it' | 'must_see';
+        notes: string;
+        wish_i_knew: string;
+        photos?: TripPhoto[];
+    }): Promise<ApiResponse<RealityEntry>> {
+        return this.request<RealityEntry>(`/trips/${tripId}/reality`, {
+            method: 'POST',
+            body: JSON.stringify(realityData),
+        });
+    }
+
+    async addDailyUpdate(tripId: string, updateData: {
+        date: string;
+        mood_rating: 1 | 2 | 3 | 4 | 5;
+        highlight: string;
+        challenge: string;
+        discovery: string;
+        photos: string[];
+        is_public: boolean;
+    }): Promise<ApiResponse<DailyUpdate>> {
+        return this.request<DailyUpdate>(`/trips/${tripId}/daily-update`, {
+            method: 'POST',
+            body: JSON.stringify(updateData),
+        });
+    }
+
+    async forkTrip(tripId: string): Promise<ApiResponse<EnhancedTrip>> {
+        return this.request<EnhancedTrip>(`/trips/${tripId}/fork`, {
+            method: 'POST',
+        });
+    }
+
+    async browsePublicTrips(filters?: {
+        transport_modes?: string[];
+        region?: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<ApiResponse<EnhancedTrip[]>> {
+        const searchParams = new URLSearchParams();
+
+        if (filters?.transport_modes?.length) {
+            searchParams.append('transport_modes', filters.transport_modes.join(','));
+        }
+        if (filters?.region) searchParams.append('region', filters.region);
+        if (filters?.limit) searchParams.append('limit', filters.limit.toString());
+        if (filters?.offset) searchParams.append('offset', filters.offset.toString());
+
+        const queryString = searchParams.toString();
+        return this.request<EnhancedTrip[]>(`/trips/browse${queryString ? `?${queryString}` : ''}`);
+    }
+
+    async voteOnTrip(tripId: string, isHelpful: boolean): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/trips/${tripId}/vote`, {
+            method: 'POST',
+            body: JSON.stringify({ helpful: isHelpful }),
+        });
+    }
+    async addSpotToTrip(tripId: string, spotData: {
+        spot_id: string;
+        order_index?: number;
+    }): Promise<ApiResponse<TripSpot>> {
+        return this.request<TripSpot>(`/trips/${tripId}/spots`, {
+            method: 'POST',
+            body: JSON.stringify(spotData),
+        });
+    }
+
+    async updateTripSpot(tripSpotId: string, updates: {
+        status?: TripSpotStatus;
+        arrived_at?: string;
+        departed_at?: string;
+        wait_time_hours?: number;
+        got_ride?: boolean;
+        ride_details?: string;
+        notes?: string;
+        safety_experience?: number;
+        effectiveness_rating?: number;
+    }): Promise<ApiResponse<TripSpot>> {
+        return this.request<TripSpot>(`/trips/spots/${tripSpotId}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+        });
+    }
+
+    async removeSpotFromTrip(tripSpotId: string): Promise<ApiResponse<{ message: string }>> {
+        return this.request(`/trips/spots/${tripSpotId}`, {
+            method: 'DELETE',
+        });
+    }
+
+    // Get user's trips
+    async getMyTrips(filters?: {
+        status?: TripStatus;
+        limit?: number;
+        offset?: number;
+    }): Promise<ApiResponse<Trip[]>> {
+        return this.getTrips({
+            ...filters,
+            user_id: 'current' // Backend should handle this based on auth
+        });
+    }
+
+
+
+    // FIX: Override createSpot for development
+    async createSpot(spotData: CreateSpotRequest): Promise<ApiResponse<SpotResponse>> {
+        if (this.isDevelopment) {
+            console.log('🔧 [DEV] Creating spot in development mode');
+
+            // In development, don't require created_by_id - let backend handle it
+            const { created_by_id, ...cleanSpotData } = spotData;
+
+            return this.request<SpotResponse>('/spots', {
+                method: 'POST',
+                body: JSON.stringify(cleanSpotData),
+            });
+        }
+
+        // Production: require authentication
+        if (!this.token) {
+            throw new Error('Authentication required to create spots');
+        }
+
+        return this.request<SpotResponse>('/spots', {
+            method: 'POST',
+            body: JSON.stringify(spotData),
+        });
+    }
     // Auth Methods
     async sendMagicLink(email: string): Promise<ApiResponse<MagicLinkResponse>> {
         return this.request<MagicLinkResponse>('/auth/magic-link', {
@@ -410,9 +676,7 @@ class ApiClient {
         return result;
     }
 
-    async getCurrentUser(): Promise<ApiResponse<any>> {
-        return this.request('/auth/me');
-    }
+
 
     async refreshToken(): Promise<ApiResponse<AuthResponse>> {
         const result = await this.request<AuthResponse>('/auth/refresh', {
@@ -601,13 +865,6 @@ class ApiClient {
         });
 
         return this.request<SpotResponse[]>(`/spots/nearby?${searchParams}`);
-    }
-
-    async createSpot(spotData: CreateSpotRequest): Promise<ApiResponse<SpotResponse>> {
-        return this.request<SpotResponse>('/spots', {
-            method: 'POST',
-            body: JSON.stringify(spotData),
-        });
     }
 
     async updateSpot(id: string, updates: Partial<CreateSpotRequest>): Promise<ApiResponse<SpotResponse>> {

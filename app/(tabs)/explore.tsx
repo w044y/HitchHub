@@ -49,7 +49,7 @@ export default function MapScreen() {
 
             switch (currentFilterMode) {
                 case 'personal':
-                    const personalModes = profile.selectedModes || [TransportMode.HITCHHIKING];
+                    const personalModes = profile.travelModes || [TransportMode.HITCHHIKING];
                     console.log('👤 Loading personal spots for modes:', personalModes);
 
                     response = await apiClient.getSpots({
@@ -128,9 +128,9 @@ export default function MapScreen() {
     // FIXED: Initialize custom modes once when profile loads
     useEffect(() => {
         if (profile && !hasInitialized) {
-            setCustomTransportModes(new Set(profile.selectedModes));
+            setCustomTransportModes(new Set(profile.travelModes));
             setHasInitialized(true);
-            console.log('🔄 Profile loaded, initializing custom modes:', profile.selectedModes);
+            console.log('🔄 Profile loaded, initializing custom modes:', profile.travelModes);
         }
     }, [profile, hasInitialized]);
 
@@ -246,7 +246,7 @@ export default function MapScreen() {
                                 styles.filterModeSubtext,
                                 { color: currentFilterMode === 'personal' ? '#FFFFFF' : colors.textSecondary }
                             ]}>
-                                {profile.selectedModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join(' ')} {profile.selectedModes.map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')}
+                                {profile.travelModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join(' ')} {profile.travelModes.map(m => TRANSPORT_MODE_LABELS[m]).join(' & ')}
                             </Text>
                         )}
                     </TouchableOpacity>
@@ -346,7 +346,7 @@ export default function MapScreen() {
 
     const handleSpotPress = (spot: HitchhikingSpot) => {
         const relevantModes = currentFilterMode === 'personal'
-            ? profile?.selectedModes || [TransportMode.HITCHHIKING] // FIXED: selectedModes
+            ? profile?.travelModes || [TransportMode.HITCHHIKING] // FIXED: travelModes
             : currentFilterMode === 'custom'
                 ? Array.from(customTransportModes)
                 : spot.transportModes || [TransportMode.HITCHHIKING];
@@ -409,7 +409,7 @@ export default function MapScreen() {
 
         const stats = getFilterStats();
         const modeDescription =
-            currentFilterMode === 'personal' ? `${profile?.selectedModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join('')} personalized` : // FIXED: selectedModes
+            currentFilterMode === 'personal' ? `${profile?.travelModes.map(m => TRANSPORT_MODE_EMOJIS[m]).join('')} personalized` : // FIXED: travelModes
                 currentFilterMode === 'custom' ? `${Array.from(customTransportModes).map(m => TRANSPORT_MODE_EMOJIS[m]).join('')} custom` :
                     '🌍 all modes';
 

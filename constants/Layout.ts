@@ -1,4 +1,4 @@
-// constants/Layout.ts
+// constants/Layout.ts - Add missing spacing values
 import { Dimensions } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -10,22 +10,25 @@ export const Layout = {
         height,
     },
 
-    // Spacing scale (8px base)
+    // Spacing scale (8px base) - FIXED: Added missing md property
     spacing: {
         xs: 4,
         sm: 8,
-        base: 16,
+        md: 16,        // ADDED: This was missing
+        base: 16,      // Keep existing for compatibility
         lg: 24,
         xl: 32,
+        xxl: 40,       // ADDED: For consistency
         '2xl': 40,
         '3xl': 48,
         '4xl': 64,
     },
 
-    // Border radius
+    // Border radius - FIXED: Added missing md property
     radius: {
         sm: 4,
-        base: 8,
+        md: 8,         // ADDED: This was missing
+        base: 8,       // Keep existing for compatibility
         lg: 12,
         xl: 16,
         '2xl': 24,

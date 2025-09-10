@@ -1,5 +1,5 @@
-// Typography.ts - Add the missing text styles
-import {Colors} from "../constants/Colors";
+// constants/Typography.ts - Updated to match your structure and add missing styles
+import { Colors } from "../constants/Colors";
 
 export const Typography = {
     fonts: {
@@ -28,8 +28,8 @@ export const Typography = {
         relaxed: 1.6,
     },
 
-    // ADD: Complete text styles using your design tokens
-    styles: {
+    // FIXED: Restructured to match your usage patterns
+    heading: {
         h1: {
             fontFamily: 'Poppins-Bold',
             fontSize: 48,
@@ -54,29 +54,54 @@ export const Typography = {
             lineHeight: 20 * 1.4,
             fontWeight: '600' as const,
         },
-        body: {
+    },
+
+    body: {
+        large: {
+            fontFamily: 'Inter-Regular',
+            fontSize: 18,
+            lineHeight: 18 * 1.4,
+            fontWeight: 'normal' as const,
+        },
+        default: {
             fontFamily: 'Inter-Regular',
             fontSize: 16,
             lineHeight: 16 * 1.4,
             fontWeight: 'normal' as const,
         },
-        bodySmall: {
+        medium: {
+            fontFamily: 'Inter-Medium',
+            fontSize: 16,
+            lineHeight: 16 * 1.4,
+            fontWeight: '500' as const,
+        },
+        small: {
             fontFamily: 'Inter-Regular',
             fontSize: 14,
             lineHeight: 14 * 1.4,
             fontWeight: 'normal' as const,
         },
-        caption: {
-            fontFamily: 'Inter-Regular',
-            fontSize: 12,
-            lineHeight: 12 * 1.4,
-            fontWeight: 'normal' as const,
-        },
-        button: {
+    },
+
+    button: {
+        primary: {
             fontFamily: 'Inter-Medium',
             fontSize: 16,
             lineHeight: 16 * 1.2,
             fontWeight: '500' as const,
         },
+        secondary: {
+            fontFamily: 'Inter-Regular',
+            fontSize: 16,
+            lineHeight: 16 * 1.2,
+            fontWeight: 'normal' as const,
+        },
+    },
+
+    caption: {
+        fontFamily: 'Inter-Regular',
+        fontSize: 12,
+        lineHeight: 12 * 1.4,
+        fontWeight: 'normal' as const,
     },
 };

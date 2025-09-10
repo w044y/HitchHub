@@ -23,20 +23,21 @@ export const TRANSPORT_MODE_EMOJIS = {
     [TransportMode.ALL]: "🚶🚶"
 };
 
+// app/types/transport.ts - Fixed HitchhikingSpot interface
 export interface HitchhikingSpot {
     id: string;
     name: string;
-    type: 'rest_stop' | 'gas_station' | 'bridge' | 'highway_entrance' | 'town_center' | 'other';
-    coordinates: {
-        latitude: number;
-        longitude: number;
-    };
-    rating: number;
-    safetyRating: 'high' | 'medium' | 'low';
     description: string;
-    addedBy: string;
-    lastUpdated: string;
-    verified: boolean;
+    latitude: number;        // FIXED: Direct properties, not nested
+    longitude: number;       // FIXED: Direct properties, not nested
+    spot_type: string;       // FIXED: Match API property name
+    safety_rating: number;   // FIXED: Match API property name
+    overall_rating: number;  // FIXED: Match API property name
+    is_verified: boolean;    // FIXED: Match API property name
+    created_by: string;      // FIXED: This will be mapped from created_by.display_name
+    created_at?: string;     // FIXED: Optional, from API
+
+    // Optional properties for map display
     transportModes?: TransportMode[];
     modeRatings?: {
         [key: string]: {
@@ -50,4 +51,19 @@ export interface HitchhikingSpot {
         };
     };
     totalReviews?: number;
+    facilities?: string[];
+    tips?: string;
+    accessibility_info?: string;
+
+    // Legacy support (will be computed from lat/lng if needed)
+    coordinates?: {
+        latitude: number;
+        longitude: number;
+    };
+    type?: 'rest_stop' | 'gas_station' | 'bridge' | 'highway_entrance' | 'town_center' | 'other';
+    rating?: number;
+    safetyRating?: 'high' | 'medium' | 'low';
+    addedBy?: string;
+    lastUpdated?: string;
+    verified?: boolean;
 }

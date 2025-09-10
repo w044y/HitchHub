@@ -1,7 +1,6 @@
-// app/contexts/AuthContext.tsx - FIXED VERSION
+// app/contexts/AuthContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { apiClient } from '@/app/services/api';
-import { Alert } from 'react-native';
 
 interface User {
     id: string;
@@ -23,10 +22,10 @@ interface AuthContextType {
     verifyMagicLink: (token: string, email: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
-    loginAsDev: () => Promise<void>;
+    setDevToken: (token: string) => void;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -40,115 +39,177 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setIsLoading(true);
 
         try {
-            // ALWAYS try to restore from token first, even in development
+            if (__DEV__) {
+                // Development: Use mock user, skip API calls
+                await setupDevelopmentAuth();
+            } else {
+                // Production: Try to restore auth from storage
+                await attemptTokenRestore();
+            }
+        } catch (error) {
+            console.error('❌ Auth initialization failed:', error);
+            console.log('🔄 Creating default profile due to API error');
+            await createDefaultProfile();
+        }
+
+        setIsLoading(false);
+    };
+// app/contexts/AuthContext.tsx - Use consistent dev user ID
+    const setupDevelopmentAuth = async () => {
+        try {
+            // Option 1: Try to get a real dev token from your backend
+            console.log('🔐 Attempting real development authentication...');
+            const result = await apiClient.loginAsDev();
+
+            if (result.data.accessToken) {
+                await apiClient.setToken(result.data.accessToken);
+                setUser(result.data.user);
+                console.log('✅ Real development authentication successful');
+                return;
+            }
+        } catch (error) {
+            console.log('⚠️ Real dev auth failed, falling back to mock user');
+        }
+
+        // Option 2: Fallback to mock user with backend-compatible ID
+        const devUser: User = {
+            id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', // FIXED: Match backend
+            email: 'dev@vendro.app',
+            username: 'devuser',
+            display_name: 'Dev User',
+            profile_photo_url: undefined,
+            vendro_points: 100,
+            safety_rating: 4.5,
+            is_verified: true,
+            created_at: new Date().toISOString(),
+        };
+
+        setUser(devUser);
+        console.log('✅ Mock development user created');
+        console.log('🎯 User ID matches backend dev user for API compatibility');
+    };
+    const createMockDevUser = async () => {
+        console.log('🔧 Creating development user...');
+
+        const devUser: User = {
+            id: 'dev-user-123',
+            email: 'dev@vendro.app',
+            username: 'devuser',
+            display_name: 'Dev User',
+            profile_photo_url: undefined,
+            vendro_points: 100,
+            safety_rating: 4.5,
+            is_verified: true,
+            created_at: new Date().toISOString(),
+        };
+
+        setUser(devUser);
+        console.log('✅ Development user created - ready for testing');
+    };
+
+    const createDefaultProfile = async () => {
+        console.log('🔧 Creating default profile...');
+
+        const defaultUser: User = {
+            id: 'default-user-456',
+            email: 'user@example.com',
+            username: 'defaultuser',
+            display_name: 'Default User',
+            profile_photo_url: undefined,
+            vendro_points: 0,
+            safety_rating: 0,
+            is_verified: false,
+            created_at: new Date().toISOString(),
+        };
+
+        setUser(defaultUser);
+        console.log('✅ Default profile created - onboarding incomplete');
+    };
+
+    const attemptTokenRestore = async () => {
+        // Try to get user from API with stored token
+        try {
             const result = await apiClient.getCurrentUser();
             setUser(result.data);
-            console.log('✅ User restored from stored token:', result.data.email);
-        } catch (error: any) {
-            console.log('🔄 No valid token found, user needs to authenticate');
-            setUser(null);
-        } finally {
-            setIsLoading(false);
+            console.log('✅ User restored from API');
+        } catch (error) {
+            console.log('ℹ️ No valid session found');
+            throw error;
         }
     };
 
     const sendMagicLink = async (email: string) => {
-        try {
-            setIsLoading(true);
-            await apiClient.sendMagicLink(email);
-            Alert.alert('Magic Link Sent', 'Check your email');
-        } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to send magic link');
-            throw error;
-        } finally {
-            setIsLoading(false);
+        if (__DEV__) {
+            console.log('🔧 [DEV] Mock magic link sent to:', email);
+            return;
         }
+        await apiClient.sendMagicLink(email);
     };
 
     const verifyMagicLink = async (token: string, email: string) => {
-        try {
-            setIsLoading(true);
-            const result = await apiClient.verifyMagicLink(token, email);
-            setUser(result.data.user);
-            console.log('✅ User authenticated successfully:', result.data.user.email);
-        } catch (error: any) {
-            Alert.alert('Authentication Failed', error.message || 'Invalid magic link');
-            throw error;
-        } finally {
-            setIsLoading(false);
+        if (__DEV__) {
+            console.log('🔧 [DEV] Mock magic link verification');
+            await createMockDevUser();
+            return;
         }
+
+        const result = await apiClient.verifyMagicLink(token, email);
+        apiClient.setToken(result.data.accessToken);
+        setUser(result.data.user);
     };
 
     const logout = async () => {
-        try {
-            setIsLoading(true);
-            await apiClient.logout();
-            await apiClient.setToken(null); // Clear the token
+        if (__DEV__) {
+            console.log('🔧 [DEV] Mock logout');
             setUser(null);
-        } catch (error) {
-            console.warn('Logout failed:', error);
-            setUser(null);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const refreshUser = async () => {
-        try {
-            const result = await apiClient.getCurrentUser();
-            setUser(result.data);
-        } catch (error: any) {
-            if (error.message === 'UNAUTHORIZED') {
-                setUser(null);
-            }
-        }
-    };
-
-    const loginAsDev = async () => {
-        if (!__DEV__) {
-            console.log('Dev login not available in production');
             return;
         }
 
         try {
-            setIsLoading(true);
-            console.log('🔧 Starting REAL dev authentication...');
-
-            // Use the REAL authentication flow
-            const result = await apiClient.loginAsDev();
-
-            // Verify the token was actually set
-            console.log('🔑 Auth result:', {
-                hasToken: !!result.data.accessToken,
-                userEmail: result.data.user.email,
-                userId: result.data.user.id
-            });
-
-            // Set user state with the REAL authenticated user
-            setUser(result.data.user);
-            console.log('✅ Dev user authenticated with real token');
-
+            await apiClient.logout();
         } catch (error) {
-            console.error('❌ Dev login failed:', error);
-            Alert.alert('Dev Login Failed', 'Check console for details');
-        } finally {
-            setIsLoading(false);
+            console.warn('Logout API call failed:', error);
+        }
+
+        apiClient.setToken(null);
+        setUser(null);
+    };
+
+    const refreshUser = async () => {
+        if (__DEV__) {
+            console.log('🔧 [DEV] Mock user refresh - no API call needed');
+            return;
+        }
+
+        try {
+            const result = await apiClient.getCurrentUser();
+            setUser(result.data);
+        } catch (error) {
+            console.error('Failed to refresh user:', error);
+            throw error;
         }
     };
 
-    const value = {
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        sendMagicLink,
-        verifyMagicLink,
-        logout,
-        refreshUser,
-        loginAsDev,
+    const setDevToken = (token: string) => {
+        if (__DEV__) {
+            apiClient.setToken(token);
+            console.log('🔧 Development token set:', token);
+        }
     };
 
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider
+            value={{
+                user,
+                isLoading,
+                isAuthenticated: !!user,
+                sendMagicLink,
+                verifyMagicLink,
+                logout,
+                refreshUser,
+                setDevToken,
+            }}
+        >
             {children}
         </AuthContext.Provider>
     );
@@ -156,7 +217,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) {
+    if (context === undefined) {
         throw new Error('useAuth must be used within an AuthProvider');
     }
     return context;
