@@ -26,6 +26,47 @@ interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
         total: number;
     };
 }
+export interface CreateFlexibleTripRequest {
+    title: string;
+    description?: string;
+
+    // Flexible location approach (new)
+    exploration_area?: {
+        center: { latitude: number; longitude: number };
+        radius: number; // km radius
+        name: string; // "Berlin", "French Alps", etc.
+    };
+    general_direction?: string; // "heading south", "through France"
+
+    // Optional traditional start/end (for backward compatibility)
+    start_address?: string;
+    end_address?: string;
+    start_latitude?: number;
+    start_longitude?: number;
+    end_latitude?: number;
+    end_longitude?: number;
+
+    travel_modes: string[];
+    is_public?: boolean;
+    planned_start_date?: string;
+    planned_end_date?: string;
+
+    // Trip type indicator
+    trip_type?: 'exploration' | 'journey' | 'adventure' | 'camping';
+}
+
+export interface TripWithFlexibleLocation extends Trip {
+    // Enhanced trip response with flexible location data
+    exploration_area?: {
+        center: { latitude: number; longitude: number };
+        radius: number;
+        name: string;
+    };
+    general_direction?: string;
+    trip_type?: string;
+    spots_discovered?: number;
+    memories_captured?: number;
+}
 interface TrustVerificationRequest {
     type: 'email' | 'phone' | 'social_facebook' | 'social_google' | 'community_vouch';
     metadata?: {
@@ -478,6 +519,294 @@ class ApiClient {
             method: 'PUT',
             body: JSON.stringify(updates),
         });
+    }
+    async createFlexibleTrip(tripData: CreateFlexibleTripRequest): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        // Transform flexible trip data to backend format
+        const backendData = {
+            title: tripData.title,
+            description: tripData.description || '',
+
+            // Handle flexible location mapping
+            start_address: tripData.exploration_area?.name || tripData.start_address || 'Flexible start',
+            end_address: tripData.general_direction || tripData.end_address || 'Open destination',
+
+            // Map exploration area to coordinates
+            start_latitude: tripData.exploration_area?.center.latitude || tripData.start_latitude,
+            start_longitude: tripData.exploration_area?.center.longitude || tripData.start_longitude,
+            end_latitude: tripData.exploration_area?.center.latitude || tripData.end_latitude,
+            end_longitude: tripData.exploration_area?.center.longitude || tripData.end_longitude,
+
+            travel_modes: tripData.travel_modes,
+            is_public: tripData.is_public || false,
+            planned_start_date: tripData.planned_start_date,
+            planned_end_date: tripData.planned_end_date,
+
+            // Store flexible location data in notes for backend compatibility
+            notes: JSON.stringify({
+                exploration_area: tripData.exploration_area,
+                general_direction: tripData.general_direction,
+                trip_type: tripData.trip_type || 'exploration'
+            }),
+
+            // Calculate estimated distance from radius
+            estimated_distance: tripData.exploration_area?.radius ? tripData.exploration_area.radius * 2 : undefined,
+        };
+
+        if (this.isDevelopment) {
+            console.log('🎒 Creating flexible trip:', {
+                original: tripData,
+                transformed: backendData
+            });
+        }
+
+        const response = await this.request<Trip>('/trips', {
+            method: 'POST',
+            body: JSON.stringify(backendData),
+        });
+
+        // Transform response back to include flexible location data
+        return {
+            ...response,
+            data: this.transformTripResponse(response.data)
+        };
+    }
+
+    // NEW: Get trips with flexible location data
+    async getMyTripsEnhanced(filters?: {
+        status?: TripStatus;
+        limit?: number;
+        offset?: number;
+    }): Promise<ApiResponse<TripWithFlexibleLocation[]>> {
+        const response = await this.getMyTrips(filters);
+
+        return {
+            ...response,
+            data: response.data.map(trip => this.transformTripResponse(trip))
+        };
+    }
+
+    // NEW: Get trip by ID with flexible location data
+    async getTripByIdEnhanced(id: string): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        const response = await this.getTripById(id);
+
+        return {
+            ...response,
+            data: this.transformTripResponse(response.data)
+        };
+    }
+
+    // NEW: Update trip with flexible location support
+    async updateFlexibleTrip(id: string, updates: Partial<CreateFlexibleTripRequest & {
+        status?: TripStatus;
+        actual_start_date?: string;
+        actual_end_date?: string;
+    }>): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        // Transform updates to backend format
+        const backendUpdates: any = {};
+
+        if (updates.title) backendUpdates.title = updates.title;
+        if (updates.description !== undefined) backendUpdates.description = updates.description;
+        if (updates.travel_modes) backendUpdates.travel_modes = updates.travel_modes;
+        if (updates.is_public !== undefined) backendUpdates.is_public = updates.is_public;
+        if (updates.planned_start_date) backendUpdates.planned_start_date = updates.planned_start_date;
+        if (updates.planned_end_date) backendUpdates.planned_end_date = updates.planned_end_date;
+        if (updates.status) backendUpdates.status = updates.status;
+        if (updates.actual_start_date) backendUpdates.actual_start_date = updates.actual_start_date;
+        if (updates.actual_end_date) backendUpdates.actual_end_date = updates.actual_end_date;
+
+        // Handle flexible location updates
+        if (updates.exploration_area || updates.general_direction) {
+            if (updates.exploration_area) {
+                backendUpdates.start_address = `Exploring ${updates.exploration_area.name}`;
+                backendUpdates.start_latitude = updates.exploration_area.center.latitude;
+                backendUpdates.start_longitude = updates.exploration_area.center.longitude;
+                backendUpdates.end_latitude = updates.exploration_area.center.latitude;
+                backendUpdates.end_longitude = updates.exploration_area.center.longitude;
+                backendUpdates.estimated_distance = updates.exploration_area.radius * 2;
+            }
+
+            if (updates.general_direction) {
+                backendUpdates.end_address = updates.general_direction;
+            }
+
+            // Update notes with new flexible location data
+            backendUpdates.notes = JSON.stringify({
+                exploration_area: updates.exploration_area,
+                general_direction: updates.general_direction,
+                trip_type: updates.trip_type || 'exploration'
+            });
+        }
+
+        const response = await this.updateTrip(id, backendUpdates);
+
+        return {
+            ...response,
+            data: this.transformTripResponse(response.data)
+        };
+    }
+
+    // NEW: Start trip (active status)
+    async startTrip(id: string): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        const response = await this.updateFlexibleTrip(id, {
+            status: TripStatus.ACTIVE,
+            actual_start_date: new Date().toISOString(),
+        });
+
+        if (this.isDevelopment) {
+            console.log('🚀 Trip started:', id);
+        }
+
+        return response;
+    }
+
+    // NEW: Complete trip
+    async completeTrip(id: string): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        const response = await this.updateFlexibleTrip(id, {
+            status: TripStatus.COMPLETED,
+            actual_end_date: new Date().toISOString(),
+        });
+
+        if (this.isDevelopment) {
+            console.log('✅ Trip completed:', id);
+        }
+
+        return response;
+    }
+
+    // NEW: Get active trip
+    async getActiveTrip(): Promise<ApiResponse<TripWithFlexibleLocation | null>> {
+        try {
+            const response = await this.getTrips({
+                status: TripStatus.ACTIVE,
+                limit: 1,
+                user_id: 'current'
+            });
+
+            if (response.data && response.data.length > 0) {
+                const transformedTrip = this.transformTripResponse(response.data[0]);
+                return {
+                    ...response,
+                    data: transformedTrip
+                };
+            }
+
+            return {
+                ...response,
+                data: null
+            };
+        } catch (error) {
+            if (this.isDevelopment) {
+                console.log('ℹ️ No active trip found or error:', error);
+            }
+            return {
+                data: null,
+                message: 'No active trip found'
+            };
+        }
+    }
+
+    // NEW: Add spot to trip (enhanced)
+    async addSpotToTripEnhanced(tripId: string, spotId: string, options?: {
+        status?: TripSpotStatus;
+        notes?: string;
+    }): Promise<ApiResponse<TripSpot>> {
+        const spotData = {
+            spot_id: spotId,
+            status: options?.status || TripSpotStatus.PLANNED,
+            notes: options?.notes,
+        };
+
+        if (this.isDevelopment) {
+            console.log('📍 Adding spot to trip:', { tripId, spotId, options });
+        }
+
+        return this.addSpotToTrip(tripId, spotData);
+    }
+
+    // NEW: Helper method to transform trip response
+    // Fix the transformTripResponse method in api.ts
+
+// First, let's check what properties your Trip interface actually has
+// Based on your types, it should be something like this:
+
+// NEW: Helper method to transform trip response (FIXED)
+    private transformTripResponse(trip: Trip): TripWithFlexibleLocation {
+        let exploration_area;
+        let general_direction;
+        let trip_type;
+
+        // Parse flexible location data from notes
+        try {
+            if (trip.notes) {
+                const parsed = JSON.parse(trip.notes);
+                exploration_area = parsed.exploration_area;
+                general_direction = parsed.general_direction;
+                trip_type = parsed.trip_type;
+            }
+        } catch (e) {
+            // Notes might not be JSON, that's okay
+        }
+
+        // FIXED: Check the actual properties that exist on your Trip type
+        // If your Trip interface has different property names, update accordingly:
+
+        // Option 1: If your Trip has start_location/end_location as Point objects:
+        if (!exploration_area && trip.start_location) {
+            // Assuming start_location is a Point object with coordinates
+            exploration_area = {
+                center: {
+                    latitude: (trip.start_location as any).coordinates?.[1] || 0, // Point format is [lng, lat]
+                    longitude: (trip.start_location as any).coordinates?.[0] || 0,
+                },
+                radius: trip.estimated_distance ? trip.estimated_distance / 2 : 10,
+                name: trip.start_address || 'Unknown area',
+            };
+        }
+
+        // Option 2: If your Trip interface doesn't have coordinate properties at all:
+        // Just remove this fallback logic entirely since it would come from the backend
+
+        return {
+            ...trip,
+            exploration_area,
+            general_direction,
+            trip_type,
+            spots_discovered: trip.trip_spots?.length || 0,
+            memories_captured: 0, // Will implement later
+        };
+    }
+
+    // NEW: Quick trip creation for "start tracking now" flow
+    async startQuickTrip(data: {
+        title: string;
+        travel_modes: string[];
+        current_location?: { latitude: number; longitude: number };
+    }): Promise<ApiResponse<TripWithFlexibleLocation>> {
+        const tripData: CreateFlexibleTripRequest = {
+            title: data.title,
+            description: 'Started on the go',
+            travel_modes: data.travel_modes,
+            trip_type: 'adventure',
+            is_public: false,
+        };
+
+        // If we have current location, set as exploration area
+        if (data.current_location) {
+            tripData.exploration_area = {
+                center: data.current_location,
+                radius: 50, // 50km default radius
+                name: 'Current area',
+            };
+        }
+
+        const response = await this.createFlexibleTrip(tripData);
+
+        // Immediately start the trip
+        if (response.data) {
+            return this.startTrip(response.data.id);
+        }
+
+        return response;
     }
 
     async deleteTrip(id: string): Promise<ApiResponse<{ message: string }>> {
